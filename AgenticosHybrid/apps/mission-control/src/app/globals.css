@@ -1,0 +1,663 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+    /* Light theme (default) - WCAG AA compliant */
+    --bg: 248 250 252;
+    --surface: 255 255 255;
+    --elevated: 255 255 255;
+    --border: 214 220 230;
+    --text: 15 23 42;
+    --muted: 90 100 120;
+    --faint: 100 110 130;
+    --accent: 79 108 255;
+    --accent-soft: 226 232 255;
+    --ok: 34 170 110;
+    --warn: 214 150 40;
+    --danger: 224 70 70;
+    --info: 70 150 224;
+
+    /* Chart tokens */
+    --chart-1: 79 108 255;
+    --chart-2: 34 170 110;
+    --chart-3: 214 150 40;
+    --chart-4: 70 150 224;
+    --chart-5: 168 85 247;
+
+    /* Fluid typography — scales from 1366px to 2560px */
+    --text-xs: clamp(10px, 0.625rem + 0.1vw, 12px);
+    --text-sm: clamp(12px, 0.75rem + 0.1vw, 14px);
+    --text-base: clamp(14px, 0.875rem + 0.15vw, 16px);
+    --text-lg: clamp(16px, 1rem + 0.2vw, 20px);
+    --text-xl: clamp(20px, 1.25rem + 0.3vw, 28px);
+    --text-2xl: clamp(24px, 1.5rem + 0.4vw, 36px);
+
+    /* Layout tokens (set by LayoutProvider) */
+    --mc-vw: 1920px;
+    --mc-vh: 1080px;
+    --mc-sidebar-w: 248px;
+    --mc-header-h: 56px;
+    --mc-notif-w: 0px;
+    --mc-content-w: 1672px;
+    --mc-content-h: 1024px;
+    --mc-grid-cols: 12;
+
+    /* Spacing scale */
+    --space-xs: clamp(4px, 0.25rem, 8px);
+    --space-sm: clamp(8px, 0.5rem, 12px);
+    --space-md: clamp(12px, 0.75rem, 20px);
+    --space-lg: clamp(16px, 1rem, 28px);
+    --space-xl: clamp(24px, 1.5rem, 40px);
+
+    /* Focus ring */
+    --focus-ring: 79 108 255;
+    --focus-ring-offset: 248 250 252;
+
+    /* Glass */
+    --glass-bg: 15 23 42;
+    --glass-alpha: 0.08;
+    --glass-strong-alpha: 0.12;
+    --glass-overlay-alpha: 0.16;
+
+    /* Motion tokens (durations for spring animations) */
+    --spring-fast-duration: 200ms;
+    --spring-base-duration: 300ms;
+    --spring-slow-duration: 500ms;
+  }
+
+  .dark {
+    /* Deep space — premium dark */
+    --bg: 8 10 16;
+    --surface: 16 19 28;
+    --elevated: 22 26 38;
+    --border: 38 44 60;
+    --text: 232 236 245;
+    --muted: 150 160 180;
+    --faint: 156 164 184;
+    --accent: 110 140 255;
+    --accent-soft: 30 38 70;
+    --ok: 56 200 130;
+    --warn: 240 176 60;
+    --danger: 248 96 96;
+    --info: 96 170 240;
+
+    /* Chart tokens */
+    --chart-1: 110 140 255;
+    --chart-2: 56 200 130;
+    --chart-3: 240 176 60;
+    --chart-4: 96 170 240;
+    --chart-5: 192 132 252;
+
+    /* Focus ring */
+    --focus-ring: 110 140 255;
+    --focus-ring-offset: 8 10 16;
+
+    /* Glass */
+    --glass-bg: 15 18 28;
+    --glass-alpha: 0.12;
+    --glass-strong-alpha: 0.18;
+    --glass-overlay-alpha: 0.24;
+  }
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden; /* OS shell manages its own scroll regions */
+  /* Use dynamic viewport height to handle mobile browser chrome */
+  min-height: 100dvh;
+}
+
+/* ── Scrollbar cleanup ──
+   Thin, modern scrollbars. Firefox uses scrollbar-width.
+   WebKit uses ::-webkit-scrollbar.
+   Only ONE scrollbar should be visible at a time (the .scroll-page).
+   Panels use overflow:hidden by default; data grids opt-in to scroll. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border)) transparent;
+}
+
+/* Hide scrollbars on panels that don't need them */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ambient backdrop — subtle radial depth, GPU-friendly */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 800px at 12% -8%, rgb(var(--accent) / 0.10), transparent 60%),
+    radial-gradient(1000px 700px at 100% 0%, rgb(var(--info) / 0.08), transparent 55%),
+    radial-gradient(900px 900px at 50% 120%, rgb(var(--ok) / 0.06), transparent 60%);
+}
+
+@layer components {
+  .glass {
+    background: rgb(var(--glass-bg) / var(--glass-alpha));
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgb(var(--border) / 0.6);
+  }
+
+  .glass-strong {
+    background: rgb(var(--glass-bg) / var(--glass-strong-alpha));
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgb(var(--border) / 0.7);
+  }
+
+  .glass-overlay {
+    background: rgb(var(--glass-bg) / var(--glass-overlay-alpha));
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgb(var(--border) / 0.8);
+  }
+
+  .panel {
+    @apply glass-strong rounded-2xl shadow-depth;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  .focus-ring {
+    @apply outline-none ring-2 ring-[rgb(var(--focus-ring)/0.6)] ring-offset-2 ring-[rgb(var(--focus-ring-offset))];
+  }
+
+  .hairline {
+    @apply border-b border-[rgb(var(--border)/0.7)];
+  }
+}
+
+/* Custom scrollbars — thin, unobtrusive (legacy selector, applies to .scroll-page) */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--faint));
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Ultra-thin scrollbars for the sidebar navigation — slim vertical rail
+   that doesn't eat into the menu width. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--faint) / 0.45);
+  border-radius: 999px;
+  border: none;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--accent) / 0.6);
+  border: none;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Neural dash flow — animated stroke-offset for connection lines */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -23;
+  }
+}
+.animate-dash-flow {
+  animation: dash-flow 1.8s linear infinite;
+}
+
+/* Animated grid texture for topology canvases */
+.grid-texture {
+  background-image:
+    linear-gradient(rgb(var(--border) / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--border) / 0.35) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Will-change hints for animated elements */
+.will-change-transform {
+  will-change: transform;
+}
+.will-change-opacity {
+  will-change: opacity;
+}
+.will-change-transform-opacity {
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Focus visible polyfill for keyboard navigation */
+:focus:not(:focus-visible) {
+  outline: none;
+  ring: none;
+}
+:focus-visible {
+  outline: none;
+  ring: 2px solid rgb(var(--focus-ring) / 0.6);
+  ring-offset: 2px;
+  ring-offset-color: rgb(var(--focus-ring-offset));
+}
+
+/* ── Responsive Layout Utilities ── */
+
+/* Single-scroll page container — eliminates nested scrolling.
+   This is the ONE place vertical scrolling happens in the app.
+   Every view renders inside this scroll container; panels inside
+   views must NOT add their own overflow-y-auto. */
+.scroll-page {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  min-height: 100dvh;
+}
+
+/* No horizontal scroll ever — global guarantee */
+.no-hscroll {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+.no-vscroll {
+  overflow-y: hidden;
+}
+
+/* ── Responsive grid system ──
+   Breakpoints: <640 (mobile), 640-768 (sm), 768-1024 (tablet),
+   1024-1280 (desktop), 1280-1536 (lg), 1536-1920 (xl), 1920-2560 (2xl), 2560+ (3xl)
+   Column counts: 1 → 2 → 3 → 4 → 5 → 6 → 6 → 6 */
+.rgrid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .rgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 768px) {
+  .rgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .rgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .rgrid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 1536px) {
+  .rgrid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+/* Auto-fill grid for cards — adapts to container width */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 639px) {
+  .card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Auto-fit grid — collapses empty tracks */
+.card-grid-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 1rem;
+}
+
+/* Responsive flex that wraps */
+.rflex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.rflex > * {
+  flex: 1 1 min(280px, 100%);
+  min-width: 0;
+}
+
+/* Fluid card: fills available space, auto-height */
+.card-fluid {
+  min-height: 0;
+  height: auto;
+  width: 100%;
+}
+
+/* Responsive table container */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-container table {
+  width: 100%;
+  min-width: 500px;
+}
+
+/* Stack panels vertically on small screens */
+@media (max-width: 1023px) {
+  .panel-stack {
+    flex-direction: column !important;
+  }
+  .panel-stack > * {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Hide on mobile */
+@media (max-width: 639px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Show only on mobile */
+.show-mobile {
+  display: none !important;
+}
+@media (max-width: 639px) {
+  .show-mobile {
+    display: revert !important;
+  }
+}
+
+/* Reduced motion override — CSS fluid measurements still work */
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ── Fluid Typography ──
+   Uses clamp() to scale font sizes smoothly from 320px to 2560px.
+   No media query jumps — continuous scaling. */
+.text-fluid-xs { font-size: clamp(9px, 0.5rem + 0.1vw, 11px); }
+.text-fluid-sm { font-size: clamp(11px, 0.625rem + 0.15vw, 13px); }
+.text-fluid-base { font-size: clamp(13px, 0.75rem + 0.2vw, 15px); }
+.text-fluid-lg { font-size: clamp(15px, 0.875rem + 0.25vw, 18px); }
+.text-fluid-xl { font-size: clamp(18px, 1rem + 0.3vw, 24px); }
+.text-fluid-2xl { font-size: clamp(22px, 1.25rem + 0.4vw, 32px); }
+.text-fluid-3xl { font-size: clamp(28px, 1.5rem + 0.5vw, 48px); }
+
+/* ── Container Queries ──
+   Enable components to respond to their container's width,
+   not just the viewport. */
+@container (max-width: 640px) {
+  .cq-stack { flex-direction: column !important; }
+  .cq-stack > * { width: 100% !important; max-width: 100% !important; }
+  .cq-hide-sm { display: none !important; }
+}
+
+@container (min-width: 1024px) {
+  .cq-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .cq-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .cq-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+}
+
+/* ── DPI / High-Density Fixes ── */
+@media (min-resolution: 1.25dppx) {
+  /* Slightly increase border widths on HiDPI displays
+     so they don't disappear */
+  * { border-width: 1px; }
+}
+
+@media (min-resolution: 2dppx) {
+  /* On retina/4K displays, ensure text rendering is crisp */
+  body { -webkit-font-smoothing: antialiased; }
+}
+
+/* ── Windows Display Scaling ──
+   At 150%+ scaling, the viewport is smaller in CSS pixels,
+   so we need to ensure layout still works. */
+@media (max-width: 1280px) and (min-resolution: 1.5dppx) {
+  .rgrid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+/* ── Touch Targets ──
+   Ensure minimum 40px touch targets for accessibility */
+@media (pointer: coarse) {
+  button, [role="button"], .clickable {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AI COMMAND CENTER — futuristic mission-control accents
+   All of these are token-driven and respect prefers-reduced-motion
+   (the global reduced-motion override zeroes animation durations).
+   No new dependencies — pure CSS built on the existing design tokens.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Command strip — top-of-view telemetry bar (mission overview header) */
+.cmd-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgb(var(--border) / 0.55);
+  border-radius: 1rem;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--surface) / 0.55),
+    rgb(var(--bg) / 0.45)
+  );
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 8px 32px -12px rgb(0 0 0 / 0.45);
+  overflow: hidden;
+}
+/* Thin top accent hairline scanning across the strip */
+.cmd-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--accent) / 0.6) 30%,
+    rgb(var(--info) / 0.5) 60%,
+    transparent
+  );
+  opacity: 0.7;
+}
+
+/* Live beam — animated progress/sheen on real data bars */
+.beam {
+  position: relative;
+  overflow: hidden;
+}
+.beam::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.22) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: beam-sheen 2.6s ease-in-out infinite;
+}
+@keyframes beam-sheen {
+  to { transform: translateX(100%); }
+}
+
+/* Scan sweep — subtle vertical scanline across data canvases */
+.scan-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.scan-sweep::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgb(var(--accent) / 0.06),
+    transparent
+  );
+  animation: scan-drift 7s linear infinite;
+  pointer-events: none;
+}
+@keyframes scan-drift {
+  0% { top: -60px; }
+  100% { top: 110%; }
+}
+
+/* Hover glow for interactive panels/cards */
+.panel-glow {
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
+}
+.panel-glow:hover {
+  border-color: rgb(var(--accent) / 0.4);
+  box-shadow:
+    0 0 0 1px rgb(var(--accent) / 0.18),
+    0 8px 40px -12px rgb(var(--accent) / 0.35);
+}
+
+/* Sci-fi corner brackets for canvases / graph viewports */
+.corner-brackets {
+  position: relative;
+}
+.corner-brackets::before,
+.corner-brackets::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0.65;
+  transition: opacity 0.2s ease;
+}
+.corner-brackets::before {
+  top: 8px;
+  left: 8px;
+  border-top: 1.5px solid rgb(var(--accent) / 0.7);
+  border-left: 1.5px solid rgb(var(--accent) / 0.7);
+  border-top-left-radius: 4px;
+}
+.corner-brackets::after {
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 1.5px solid rgb(var(--accent) / 0.7);
+  border-right: 1.5px solid rgb(var(--accent) / 0.7);
+  border-bottom-right-radius: 4px;
+}
+
+/* Compact metric tick — label + mono value in one line */
+.metric-tick {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.metric-tick .metric-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgb(var(--faint) / 0.75);
+}
+.metric-tick .metric-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(var(--text));
+}
+
+/* Soft focus glow for selected command tiles */
+.tile-active {
+  background: rgb(var(--accent) / 0.12);
+  border-color: rgb(var(--accent) / 0.45);
+  box-shadow:
+    inset 0 0 18px rgb(var(--accent) / 0.08),
+    0 0 24px -8px rgb(var(--accent) / 0.5);
+}
+
+@keyframes dash-flow {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-dash-flow {
+  animation: dash-flow 1.2s linear infinite;
+}
+
+@keyframes neural-pulse-fast {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+.animate-neural-fast {
+  animation: neural-pulse-fast 0.8s ease-in-out infinite;
+}

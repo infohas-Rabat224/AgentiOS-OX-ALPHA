@@ -1,0 +1,6 @@
+{
+  "name": "AgenticOS Core Performance Debugger & Architecture Optimizer",
+  "description": "AgenticOS Mission Control interface with live Brains Registry, Neural Constellation, AI Brain Synapse, Swarm Studio, and kernel performance optimization suite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
