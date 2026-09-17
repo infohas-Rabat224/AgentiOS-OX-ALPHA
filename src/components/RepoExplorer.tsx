@@ -34,7 +34,7 @@ export const RepoExplorer: React.FC = () => {
                 WORKSPACE CLONE
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                ./AgenticosHybrid/
+                ./AgentiOS-OX-ALPHA/ (github.com/infohas-Rabat224/AgentiOS-OX-ALPHA)
               </span>
             </div>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">

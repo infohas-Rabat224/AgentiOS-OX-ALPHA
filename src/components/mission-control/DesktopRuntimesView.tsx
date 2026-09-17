@@ -86,15 +86,61 @@ export const DesktopRuntimesView: React.FC = () => {
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [benchmarkResult, setBenchmarkResult] = useState<string | null>(null);
 
-  const handleRunBenchmark = () => {
+  const handleRunBenchmark = async () => {
     setIsBenchmarking(true);
     setBenchmarkResult(null);
-    setTimeout(() => {
-      setIsBenchmarking(false);
+
+    try {
+      // 1. Real FP32 Vector & Matrix Computation
+      const matrixSize = 250;
+      const t0 = performance.now();
+      const a = new Float32Array(matrixSize * matrixSize);
+      const b = new Float32Array(matrixSize * matrixSize);
+      const c = new Float32Array(matrixSize * matrixSize);
+      for (let i = 0; i < a.length; i++) {
+        a[i] = (i % 100) * 0.01;
+        b[i] = (i % 50) * 0.02;
+      }
+      for (let i = 0; i < matrixSize; i++) {
+        for (let j = 0; j < matrixSize; j++) {
+          let sum = 0;
+          for (let k = 0; k < matrixSize; k++) {
+            sum += a[i * matrixSize + k] * b[k * matrixSize + j];
+          }
+          c[i * matrixSize + j] = sum;
+        }
+      }
+      const matrixTimeMs = (performance.now() - t0).toFixed(2);
+
+      // 2. Real JSON Serialization / Parsing
+      const t1 = performance.now();
+      const samplePayload = Array.from({ length: 2500 }, (_, i) => ({
+        id: `node-${i}`,
+        type: 'agent_envelope',
+        payload: { task: `compute-${i}`, vector: [0.1, 0.2, 0.3, 0.4, 0.5] },
+        timestamp: Date.now(),
+      }));
+      const serialized = JSON.stringify(samplePayload);
+      const parsed = JSON.parse(serialized);
+      const jsonTimeMs = (performance.now() - t1).toFixed(2);
+
+      // 3. Real Cryptographic SHA-256 Digest
+      const t2 = performance.now();
+      const cryptoBuffer = new Uint8Array(512 * 1024);
+      cryptoBuffer.fill(0x5a);
+      await crypto.subtle.digest('SHA-256', cryptoBuffer);
+      const cryptoTimeMs = (performance.now() - t2).toFixed(2);
+
+      const memUsage = (performance as any).memory
+        ? `${Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024))} MB heap`
+        : 'Active V8 Runtime Engine';
+
       setBenchmarkResult(
-        'Host System Benchmark (1000x1000 Matrix FP32 & JSON Parser):\n- Bun 1.4.0: 6.2 ms (JavaScriptCore native SIMD)\n- Node.js 22.23.2: 10.4 ms (V8 Turbofan JIT)\n- Python 3.10.12: 1.8 ms (Vectorized NumPy / PyTorch)\n- Git index traverse: 3.1 ms'
+        `Host System Micro-Benchmark (Real Measurements Executed):\n• FP32 Matrix Mult (${matrixSize}x${matrixSize}): ${matrixTimeMs} ms\n• JSON Engine Parse & Stringify (2,500 envelopes, ${Math.round(serialized.length / 1024)} KB): ${jsonTimeMs} ms\n• WebCrypto SHA-256 (512 KB payload): ${cryptoTimeMs} ms\n• Memory & Engine State: ${memUsage}`
       );
-    }, 850);
+    } finally {
+      setIsBenchmarking(false);
+    }
   };
 
   return (

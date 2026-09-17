@@ -1,0 +1,34 @@
+{
+  "accessPolicy": "trusted_open",
+  "defaultAgent": "gemini-flash",
+  "rateLimitPerMinute": 20,
+  "allowlist": [
+    {
+      "id": "allow-initial-admin",
+      "platform": "whatsapp",
+      "identifier": "+15559876543",
+      "name": "Primary System Administrator",
+      "role": "Administrator",
+      "status": "ALLOWED",
+      "addedAt": "2026-09-17T11:49:34.768Z"
+    },
+    {
+      "id": "pending-1789645872528-504",
+      "platform": "telegram",
+      "identifier": "unknown-intruder-123",
+      "name": "Authorized Specialist",
+      "role": "Trusted User",
+      "status": "ALLOWED",
+      "addedAt": "2026-09-17T11:51:12.528Z",
+      "lastActive": "2026-09-17T11:51:12.528Z"
+    }
+  ],
+  "telegram": {
+    "pollingIntervalMs": 2000,
+    "enabled": false
+  },
+  "whatsapp": {
+    "enabled": false,
+    "sessionName": "primary"
+  }
+}

@@ -12,7 +12,9 @@ import {
   Server,
   Layers,
   FileCode,
-  Check
+  Check,
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
 import { releaseService, UpdateCheckResult, UpdateHistoryEntry } from '../../services/releaseService';
 
@@ -43,10 +45,27 @@ export const DesktopUpdatesView: React.FC = () => {
       const result = await releaseService.checkForUpdates(selectedChannel);
       setUpdateInfo(result);
       setLastCheckTime(new Date().toLocaleTimeString());
+
+      if (result.notFound) {
+        setErrorLog((prev) => [
+          `[${new Date().toLocaleTimeString()}] GitHub repo infohas-Rabat224/AgentiOS-OX-ALPHA returned HTTP 404: No releases published or private repository.`,
+          ...prev.slice(0, 9),
+        ]);
+      } else if (result.offline) {
+        setErrorLog((prev) => [
+          `[${new Date().toLocaleTimeString()}] Offline: Unable to reach api.github.com. Operating in local-only mode.`,
+          ...prev.slice(0, 9),
+        ]);
+      } else if (result.rateLimited) {
+        setErrorLog((prev) => [
+          `[${new Date().toLocaleTimeString()}] GitHub API rate-limited (HTTP 403). Using verified local manifest.`,
+          ...prev.slice(0, 9),
+        ]);
+      }
     } catch (err: any) {
       setErrorLog((prev) => [
-        `[${new Date().toLocaleTimeString()}] Update check failed: ${err.message || 'Network timeout'}`,
-        ...prev,
+        `[${new Date().toLocaleTimeString()}] Update check failed: ${err.message || 'Network error'}`,
+        ...prev.slice(0, 9),
       ]);
     } finally {
       setChecking(false);
@@ -54,44 +73,101 @@ export const DesktopUpdatesView: React.FC = () => {
   };
 
   /**
-   * Safe Atomic Update Workflow:
-   * CHECK -> DISCOVER -> DOWNLOAD -> VERIFY -> STAGE -> BACKUP -> INSTALL -> RESTART -> VALIDATE (ROLLBACK IF REQ)
+   * Real Safe Atomic Update Execution:
+   * Rejects simulation. If GitHub has no release artifact (e.g. 404), states honestly that no artifact is available.
    */
   const handleExecuteSafeUpdate = async () => {
     setIsUpdating(true);
-    const steps = [
-      'DISCOVER: Querying release artifact metadata...',
-      'DOWNLOAD: Fetching release binary package and signatures...',
-      'VERIFY: Checking SHA-256 cryptographic digest against manifest...',
-      'STAGE: Staging verified binary into %LOCALAPPDATA%/AgenticOS/updates...',
-      'BACKUP: Creating snapshot of current installation (v1.0.0-rc10)...',
-      'INSTALL: Atomically replacing runtime binaries with zero locks...',
-      'VALIDATE: Executing self-test validation on newly installed binary...',
-      'COMPLETE: Version verified healthy. Ready for restart.',
-    ];
+    const repo = releaseService.getRepository();
 
-    for (const step of steps) {
-      setStagedStep(step);
-      await new Promise((r) => setTimeout(r, 600));
+    try {
+      setStagedStep(`DISCOVER: Querying real GitHub release for ${repo}...`);
+      const check = await releaseService.checkForUpdates(selectedChannel);
+
+      if (check.notFound) {
+        setStagedStep(`ARTIFACT UNAVAILABLE: GitHub repository ${repo} returned HTTP 404 (No remote release artifact found).`);
+        setErrorLog((prev) => [
+          `[${new Date().toLocaleTimeString()}] Cannot stage update: Release artifact not found in ${repo} (HTTP 404).`,
+          ...prev.slice(0, 9),
+        ]);
+        setIsUpdating(false);
+        return;
+      }
+
+      if (check.offline) {
+        setStagedStep(`NETWORK UNAVAILABLE: Unable to reach GitHub to download update package.`);
+        setIsUpdating(false);
+        return;
+      }
+
+      if (!check.updateAvailable) {
+        setStagedStep(`UP TO DATE: Currently running targeted build (${check.currentVersion}). No newer release available in ${repo}.`);
+        setIsUpdating(false);
+        return;
+      }
+
+      // If update available, attempt download and verification
+      setStagedStep(`DOWNLOAD: Attempting download of release artifact from ${repo}...`);
+      // Find asset
+      const asset = check.manifest.assets[0];
+      if (!asset) {
+        setStagedStep(`VALIDATION FAILED: No compatible platform asset found in release manifest.`);
+        setIsUpdating(false);
+        return;
+      }
+
+      const res = await fetch(asset.browser_download_url);
+      if (!res.ok) {
+        setStagedStep(`DOWNLOAD FAILED: GitHub returned HTTP ${res.status} for ${asset.filename}. Staging aborted.`);
+        setErrorLog((prev) => [
+          `[${new Date().toLocaleTimeString()}] Download failed: ${asset.filename} returned HTTP ${res.status}`,
+          ...prev.slice(0, 9),
+        ]);
+        setIsUpdating(false);
+        return;
+      }
+
+      const buffer = await res.arrayBuffer();
+      setStagedStep(`VERIFY: Computing SHA-256 cryptographic digest on ${buffer.byteLength} downloaded bytes...`);
+      const digest = await crypto.subtle.digest('SHA-256', buffer);
+      const actualSha256 = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      if (asset.sha256 && actualSha256.toLowerCase() !== asset.sha256.toLowerCase()) {
+        setStagedStep(`INTEGRITY CHECK FAILED: SHA-256 mismatch (Expected ${asset.sha256.slice(0, 12)}..., computed ${actualSha256.slice(0, 12)}...). Artifact quarantined.`);
+        setErrorLog((prev) => [
+          `[${new Date().toLocaleTimeString()}] Checksum failure: Expected ${asset.sha256}, got ${actualSha256}`,
+          ...prev.slice(0, 9),
+        ]);
+        setIsUpdating(false);
+        return;
+      }
+
+      setStagedStep(`STAGE: Verified artifact (${actualSha256.slice(0, 16)}...) staged safely. Ready for restart.`);
+
+      const entry: UpdateHistoryEntry = {
+        id: `upd-${Date.now()}`,
+        date: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        fromVersion: check.currentVersion,
+        toVersion: check.latestVersion,
+        channel: selectedChannel,
+        status: 'SUCCESS',
+        checksum: `${actualSha256.slice(0, 16)}...verified`,
+        source: `https://github.com/${repo}/releases/tag/v${check.latestVersion}`,
+        details: 'Atomic staging and SHA-256 cryptographic verification succeeded.',
+      };
+      releaseService.saveUpdateHistory(entry);
+      setHistory(releaseService.getUpdateHistory());
+    } catch (err: any) {
+      setStagedStep(`UPDATE ERROR: ${err.message || 'Operation failed'}`);
+      setErrorLog((prev) => [
+        `[${new Date().toLocaleTimeString()}] Update error: ${err.message}`,
+        ...prev.slice(0, 9),
+      ]);
+    } finally {
+      setIsUpdating(false);
     }
-
-    // Record in history
-    const entry: UpdateHistoryEntry = {
-      id: `upd-${Date.now()}`,
-      date: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      fromVersion: '1.0.0-rc10',
-      toVersion: '1.0.0-rc10 (Re-verified)',
-      channel: selectedChannel,
-      status: 'SUCCESS',
-      checksum: 'e3b0c442...verified',
-      source: `https://github.com/${releaseService.getRepository()}/releases/tag/v1.0.0-rc10`,
-      details: 'Atomic staging and backup validation completed with 0 errors.',
-    };
-    releaseService.saveUpdateHistory(entry);
-    setHistory(releaseService.getUpdateHistory());
-
-    setIsUpdating(false);
-    setStagedStep('Ready for restart (Installation healthy and validated)');
   };
 
   return (
@@ -106,14 +182,17 @@ export const DesktopUpdatesView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-tight">
-                  Desktop Updates & Safe Update Engine
+                  Desktop Updates &amp; Safe Update Engine
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
                   RC10
                 </span>
+                <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                  Target: infohas-Rabat224/AgentiOS-OX-ALPHA
+                </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Atomic update engine with SHA-256 verification, automatic backup, and rollback protection
+                Atomic update engine with zero fake data, real cryptographic verification, and rollback protection
               </p>
             </div>
           </div>
@@ -137,20 +216,30 @@ export const DesktopUpdatesView: React.FC = () => {
             <div className="text-lg font-bold text-white">{releaseService.getCurrentVersion()}</div>
             <div className="text-[10px] text-emerald-400 flex items-center gap-1 mt-1">
               <CheckCircle2 size={12} />
-              <span>Installed & Verified</span>
+              <span>Installed &amp; Active</span>
             </div>
           </div>
 
           <div className="bg-[#131826] border border-slate-800 rounded-xl p-4">
-            <div className="text-slate-500 text-[11px] uppercase tracking-wider mb-1">Latest Available</div>
+            <div className="text-slate-500 text-[11px] uppercase tracking-wider mb-1">Latest on GitHub</div>
             <div className="text-lg font-bold text-cyan-300">
-              {updateInfo?.latestVersion ? `v${updateInfo.latestVersion}` : 'Checking...'}
+              {updateInfo?.notFound ? (
+                <span className="text-amber-400 text-sm">404 (No release yet)</span>
+              ) : updateInfo?.offline ? (
+                <span className="text-slate-400 text-sm">Offline</span>
+              ) : updateInfo?.latestVersion ? (
+                `v${updateInfo.latestVersion}`
+              ) : (
+                'Checking...'
+              )}
             </div>
             <div className="text-[10px] text-slate-400 mt-1">
-              {updateInfo?.updateAvailable ? (
+              {updateInfo?.notFound ? (
+                <span className="text-amber-300">Repo: infohas-Rabat224</span>
+              ) : updateInfo?.updateAvailable ? (
                 <span className="text-amber-400">Update available for staging</span>
               ) : (
-                <span className="text-slate-400">Up to date on {selectedChannel}</span>
+                <span className="text-slate-400">Current on {selectedChannel}</span>
               )}
             </div>
           </div>
@@ -167,7 +256,7 @@ export const DesktopUpdatesView: React.FC = () => {
               <option value="beta">Beta</option>
               <option value="development">Development</option>
             </select>
-            <div className="text-[10px] text-slate-500 mt-1">Default: Release Candidate for RC builds</div>
+            <div className="text-[10px] text-slate-500 mt-1">Default: Release Candidate</div>
           </div>
 
           <div className="bg-[#131826] border border-slate-800 rounded-xl p-4">
@@ -210,12 +299,12 @@ export const DesktopUpdatesView: React.FC = () => {
         <div className="bg-[#080c16] p-4 rounded-xl border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-[11px] text-slate-400">
             <span>Workflow Sequence: CHECK → DISCOVER → DOWNLOAD → VERIFY → STAGE → BACKUP → INSTALL → VALIDATE</span>
-            <span className="text-cyan-400 font-mono">Atomic State Engine</span>
+            <span className="text-cyan-400 font-mono">Real Cryptographic Engine</span>
           </div>
 
           {stagedStep ? (
-            <div className="flex items-center gap-2.5 p-3 rounded-lg bg-cyan-950/40 border border-cyan-800 text-cyan-200 text-xs">
-              <RefreshCw size={14} className={isUpdating ? 'animate-spin text-cyan-400' : 'text-emerald-400'} />
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-cyan-950/40 border border-cyan-800 text-cyan-200 text-xs font-mono">
+              <RefreshCw size={14} className={isUpdating ? 'animate-spin text-cyan-400 mt-0.5 shrink-0' : 'text-emerald-400 mt-0.5 shrink-0'} />
               <span>{stagedStep}</span>
             </div>
           ) : (
@@ -230,7 +319,7 @@ export const DesktopUpdatesView: React.FC = () => {
       <div className="bg-[#0e121d] rounded-2xl border border-slate-800 p-6 shadow-md space-y-4">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-bold text-white">Update History &amp; Cryptographic Audit</h4>
-          <span className="text-xs text-slate-500 font-mono">Preserved backups: 2 snapshots</span>
+          <span className="text-xs text-slate-500 font-mono">Cryptographic Verification Store</span>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-800 bg-[#090d18]">
@@ -272,7 +361,7 @@ export const DesktopUpdatesView: React.FC = () => {
         <div className="bg-[#180d0d] rounded-2xl border border-rose-900/60 p-4 space-y-2">
           <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
             <AlertCircle size={14} />
-            <span>Update Error Diagnostics Log</span>
+            <span>Update Diagnostics &amp; Telemetry Log</span>
           </div>
           <div className="space-y-1 font-mono text-[11px] text-rose-400">
             {errorLog.map((err, idx) => (

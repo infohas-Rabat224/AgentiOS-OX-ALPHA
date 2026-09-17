@@ -1,0 +1,29 @@
+[package]
+name = "agentic-os-desktop"
+version = "1.0.0-rc10"
+description = "AgenticOS Desktop Runtime with Kernel v2 and OmniRoute Matrix"
+authors = ["AgenticOS Core Team"]
+edition = "2021"
+
+[lib]
+name = "agentic_os_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = [] }
+tauri-plugin-shell = "2.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.38", features = ["full", "fs", "io-util"] }
+futures-util = "0.3"
+reqwest = { version = "0.12", features = ["stream", "json"] }
+sha2 = "0.10"
+log = "0.4"
+thiserror = "1.0"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

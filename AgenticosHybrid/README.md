@@ -2,22 +2,22 @@
 
 A **local-first, event-bus-driven AI Agent Operating System** that orchestrates autonomous agents, swarms, and distributed runtimes across a single node or an entire cluster — with a polished desktop runtime, an immersive Mission Control dashboard, and a fully autonomous self-improving ecosystem.
 
-[GitHub](https://github.com/rachidSabah/AgenticosHybrid) | [Changelog](CHANGELOG.md) | [Architecture](ARCHITECTURE.md) | [Security](SECURITY.md) | [Roadmap](ROADMAP.md)
+[GitHub](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA) | [Changelog](CHANGELOG.md) | [Architecture](ARCHITECTURE.md) | [Security](SECURITY.md) | [Roadmap](ROADMAP.md)
 
 ---
 
 ## Download & Install
 
-Pre-built installers are available on the [GitHub Releases page](https://github.com/rachidSabah/AgenticosHybrid/releases/latest):
+Pre-built installers are available on the [GitHub Releases page](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest):
 
 | Platform | Installer | Size | Type |
 |----------|-----------|------|------|
-| **Windows 10+** | [`AgenticOS-Setup-x64.exe`](https://github.com/rachidSabah/AgenticosHybrid/releases/latest/download/AgenticOS-Setup-x64.exe) | 6.2 MB | NSIS installer (recommended) |
-| **Windows 10+** | [`AgenticOS-Portable-x64.zip`](https://github.com/rachidSabah/AgenticosHybrid/releases/latest/download/AgenticOS-Portable-x64.zip) | 7.7 MB | Portable (no install needed) |
-| **Linux** | [`AgenticOS-x86_64.AppImage`](https://github.com/rachidSabah/AgenticosHybrid/releases/latest/download/AgenticOS-x86_64.AppImage) | 78.9 MB | AppImage (chmod +x and run) |
-| **Linux** | [`AgenticOS-x86_64.deb`](https://github.com/rachidSabah/AgenticosHybrid/releases/latest/download/AgenticOS-x86_64.deb) | 7.9 MB | Debian/Ubuntu package |
-| **Linux** | [`AgenticOS-x86_64.rpm`](https://github.com/rachidSabah/AgenticosHybrid/releases/latest/download/AgenticOS-x86_64.rpm) | 7.9 MB | Fedora/RHEL package |
-| **macOS 12+** | [`AgenticOS-x86_64.dmg`](https://github.com/rachidSabah/AgenticosHybrid/releases/latest/download/AgenticOS-x86_64.dmg) | 7.6 MB | Apple Disk Image |
+| **Windows 10+** | [`AgenticOS-Setup-x64.exe`](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest/download/AgenticOS-Setup-x64.exe) | 6.2 MB | NSIS installer (recommended) |
+| **Windows 10+** | [`AgenticOS-Portable-x64.zip`](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest/download/AgenticOS-Portable-x64.zip) | 7.7 MB | Portable (no install needed) |
+| **Linux** | [`AgenticOS-x86_64.AppImage`](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest/download/AgenticOS-x86_64.AppImage) | 78.9 MB | AppImage (chmod +x and run) |
+| **Linux** | [`AgenticOS-x86_64.deb`](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest/download/AgenticOS-x86_64.deb) | 7.9 MB | Debian/Ubuntu package |
+| **Linux** | [`AgenticOS-x86_64.rpm`](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest/download/AgenticOS-x86_64.rpm) | 7.9 MB | Fedora/RHEL package |
+| **macOS 12+** | [`AgenticOS-x86_64.dmg`](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest/download/AgenticOS-x86_64.dmg) | 7.6 MB | Apple Disk Image |
 
 > **Note:** MSI installer was removed in rc10 because WiX requires numeric-only
 > pre-release identifiers. The NSIS `.exe` installer works on all Windows versions.
@@ -26,13 +26,13 @@ Pre-built installers are available on the [GitHub Releases page](https://github.
 
 #### Option A — NSIS Installer (recommended)
 
-1. Download `AgenticOS-Setup-x64.exe` from the [Releases page](https://github.com/rachidSabah/AgenticosHybrid/releases/latest).
+1. Download `AgenticOS-Setup-x64.exe` from the [Releases page](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest).
 2. Run the installer — it installs Python runtime, backend, frontend, and registers file associations.
 3. **AgenticOS launches automatically after installation.**
 
 #### Option B — Portable ZIP (no installation)
 
-1. Download `AgenticOS-Portable-x64.zip` from the [Releases page](https://github.com/rachidSabah/AgenticosHybrid/releases/latest).
+1. Download `AgenticOS-Portable-x64.zip` from the [Releases page](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest).
 2. Extract to any folder (e.g. a USB drive).
 3. Run `start.bat` or `start.ps1` to launch AgenticOS — **no admin rights required**.
 
@@ -40,7 +40,7 @@ Pre-built installers are available on the [GitHub Releases page](https://github.
 
 ```bash
 # Clone and run from source (development)
-git clone https://github.com/rachidSabah/AgenticosHybrid.git
+git clone https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA.git
 cd AgenticosHybrid
 uv sync --dev
 uv run python -m agentic_os serve --host 127.0.0.1 --port 8000
@@ -258,7 +258,7 @@ Every bus message is wrapped in an `EventEnvelope` (id, type, source, timestamp,
 
 The fastest way to try AgenticOS:
 
-1. **Download** the installer for your platform from the [GitHub Releases](https://github.com/rachidSabah/AgenticosHybrid/releases) page.
+1. **Download** the installer for your platform from the [GitHub Releases](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases) page.
 2. **Run** the installer and launch AgenticOS.
 3. **Use** the Mission Control dashboard at the automatically opened window.
 
@@ -266,7 +266,7 @@ That's it. No terminal, no package managers, no configuration files.
 
 ## Windows Installation
 
-> **Download the latest release:** [AgenticOS-Setup-x64.exe](https://github.com/rachidSabah/AgenticosHybrid/releases/latest) · [AgenticOS-Portable-x64.zip](https://github.com/rachidSabah/AgenticosHybrid/releases/latest)
+> **Download the latest release:** [AgenticOS-Setup-x64.exe](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest) · [AgenticOS-Portable-x64.zip](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/latest)
 
 ![Windows Installer](docs/screenshots/windows-installer.png)
 *The AgenticOS NSIS installer guides you through installation in under 60 seconds.*
@@ -280,13 +280,13 @@ That's it. No terminal, no package managers, no configuration files.
 
 ### Option A — NSIS Installer (recommended)
 
-1. Download `AgenticOS-Setup-x64.exe` from the [Releases page](https://github.com/rachidSabah/AgenticosHybrid/releases).
+1. Download `AgenticOS-Setup-x64.exe` from the [Releases page](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases).
 2. Run the installer — it installs Python runtime, backend, frontend, and registers file associations.
 3. AgenticOS launches automatically after installation.
 
 ### Option B — Portable ZIP (no installation)
 
-1. Download `AgenticOS-Portable-x64.zip` from the [Releases page](https://github.com/rachidSabah/AgenticosHybrid/releases).
+1. Download `AgenticOS-Portable-x64.zip` from the [Releases page](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases).
 2. Extract to any folder (e.g. a USB drive).
 3. Run `start.bat` or `start.ps1` to launch AgenticOS — no admin rights required.
 
@@ -294,7 +294,7 @@ That's it. No terminal, no package managers, no configuration files.
 
 ```powershell
 # Prerequisites: Node.js 20+, Rust stable, Python 3.12+
-git clone https://github.com/rachidSabah/AgenticosHybrid
+git clone https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA.git
 cd AgenticosHybrid
 pip install uv
 uv sync
@@ -595,7 +595,7 @@ curl http://localhost:8000/api/desktop/diagnostics
 
 ```bash
 # Clone the repository
-git clone https://github.com/rachidSabah/AgenticosHybrid.git
+git clone https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA.git
 cd AgenticOS
 
 # Install Python dependencies
@@ -957,9 +957,9 @@ A: No data is collected by default. Telemetry is opt-in and can be enabled in Se
 ## Support
 
 - **Documentation** — See [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), and the `docs/` directory.
-- **GitHub Issues** — Report bugs and request features at [github.com/rachidSabah/AgenticosHybrid/issues](https://github.com/rachidSabah/AgenticosHybrid/issues).
+- **GitHub Issues** — Report bugs and request features at [github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/issues](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/issues).
 - **Security Issues** — Report vulnerabilities privately to security@agenticos.dev (see [SECURITY.md](SECURITY.md)).
-- **Discussions** — Join the conversation on [GitHub Discussions](https://github.com/rachidSabah/AgenticosHybrid/discussions).
+- **Discussions** — Join the conversation on [GitHub Discussions](https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/discussions).
 
 ## Contributing
 

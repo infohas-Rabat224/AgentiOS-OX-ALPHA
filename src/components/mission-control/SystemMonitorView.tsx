@@ -16,6 +16,7 @@ import {
   Clock,
   Gauge
 } from 'lucide-react';
+import { messagingGatewayClient, SystemTelemetry } from '../../services/messagingGatewayClient';
 
 interface ProcessItem {
   pid: number;
@@ -38,15 +39,27 @@ const INITIAL_PROCESSES: ProcessItem[] = [
 export const SystemMonitorView: React.FC = () => {
   const [isRunningDoctor, setIsRunningDoctor] = useState(false);
   const [doctorReport, setDoctorReport] = useState<any | null>(null);
+  const [telemetry, setTelemetry] = useState<SystemTelemetry | null>(null);
   const [cpuUsage, setCpuUsage] = useState(14.8);
   const [memUsage, setMemUsage] = useState(4.2); // GB
   const [uptimeSeconds, setUptimeSeconds] = useState(4820);
 
+  const pollTelemetry = async () => {
+    try {
+      const data = await messagingGatewayClient.getTelemetry();
+      setTelemetry(data);
+      setCpuUsage(data.cpuPercent);
+      setMemUsage(+(data.memory.usedBytes / (1024 * 1024 * 1024)).toFixed(2));
+      setUptimeSeconds(data.uptimeSeconds);
+    } catch {
+      // Fallback increment
+      setUptimeSeconds((prev) => prev + 2);
+    }
+  };
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setUptimeSeconds((prev) => prev + 1);
-      setCpuUsage((prev) => +(12 + Math.random() * 6).toFixed(1));
-    }, 2000);
+    pollTelemetry();
+    const timer = setInterval(pollTelemetry, 3000);
     return () => clearInterval(timer);
   }, []);
 
@@ -112,11 +125,11 @@ export const SystemMonitorView: React.FC = () => {
               <Cpu size={15} className="text-accent" />
               <span>CPU Utilization</span>
             </div>
-            <span>8 Cores</span>
+            <span>{telemetry?.cpuCount || 2} Cores ({telemetry?.arch || 'x64'})</span>
           </div>
           <div className="text-2xl font-bold text-text">{cpuUsage}%</div>
           <div className="h-1.5 w-full bg-surface/60 rounded-full overflow-hidden">
-            <div className="h-full bg-accent transition-all duration-500" style={{ width: `${cpuUsage}%` }} />
+            <div className="h-full bg-accent transition-all duration-500" style={{ width: `${Math.min(100, Math.max(1, cpuUsage))}%` }} />
           </div>
         </div>
 
@@ -127,25 +140,28 @@ export const SystemMonitorView: React.FC = () => {
               <MemoryStick size={15} className="text-emerald-400" />
               <span>RAM Allocation</span>
             </div>
-            <span>64.0 GB Total</span>
+            <span>{((telemetry?.memory.totalBytes || 4294967296) / (1024 * 1024 * 1024)).toFixed(1)} GB Total</span>
           </div>
-          <div className="text-2xl font-bold text-text">{memUsage} GB <span className="text-xs text-muted font-normal">(6.5%)</span></div>
+          <div className="text-2xl font-bold text-text">{memUsage} GB <span className="text-xs text-muted font-normal">({telemetry?.memory.usedPercent || 15}%)</span></div>
           <div className="h-1.5 w-full bg-surface/60 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-400" style={{ width: '6.5%' }} />
+            <div className="h-full bg-emerald-400" style={{ width: `${Math.min(100, telemetry?.memory.usedPercent || 15)}%` }} />
           </div>
         </div>
 
-        {/* GPU */}
+        {/* Host Platform & Daemon */}
         <div className="p-4 rounded-xl border border-border/40 bg-surface/30 space-y-2">
           <div className="flex items-center justify-between text-muted">
             <div className="flex items-center gap-1.5">
-              <Gauge size={15} className="text-purple-400" />
-              <span>GPU Acceleration</span>
+              <Server size={15} className="text-purple-400" />
+              <span>Host Architecture</span>
             </div>
-            <span>CUDA / Metal</span>
+            <span className="text-purple-300 font-bold">{telemetry?.platform?.toUpperCase() || 'LINUX'}</span>
           </div>
-          <div className="text-2xl font-bold text-text">Apple M3 Pro <span className="text-xs text-purple-300 font-normal">18-Core</span></div>
-          <div className="text-[10px] text-muted">Unified VRAM: 18 GB Active</div>
+          <div className="text-xl font-bold text-text">{telemetry?.arch || 'x64'} <span className="text-xs text-muted font-normal">({telemetry?.release?.slice(0, 14) || 'Linux Kernel'})</span></div>
+          <div className="text-[10px] text-muted flex items-center gap-1.5">
+            <span className={`h-1.5 w-1.5 rounded-full ${telemetry?.kernelDaemon?.online ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            Daemon: {telemetry?.kernelDaemon?.online ? 'Port 8001 Online' : 'Active Bridge'}
+          </div>
         </div>
 
         {/* Disk & Uptime */}
@@ -158,7 +174,7 @@ export const SystemMonitorView: React.FC = () => {
             <span className="text-emerald-400">• Active</span>
           </div>
           <div className="text-2xl font-bold text-text">{formatUptime(uptimeSeconds)}</div>
-          <div className="text-[10px] text-muted">Disk Free: 482.4 GB / 1.0 TB (SSD)</div>
+          <div className="text-[10px] text-muted">Load Average: {telemetry?.loadAvg?.map(l => l.toFixed(2)).join(', ') || '0.00, 0.00, 0.00'}</div>
         </div>
       </div>
 

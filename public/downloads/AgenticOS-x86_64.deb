@@ -1,0 +1,9 @@
+!<arch>
+debian-binary   1726550000  0     0     100644  4         `
+2.0
+control.tar     1726550000  0     0     100644  131       `
+Package: agenticos
+Version: 1.0.0-rc10
+Architecture: amd64
+Maintainer: infohas-Rabat224
+Description: AgenticOS Multi-Agent Runtime

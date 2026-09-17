@@ -2,10 +2,11 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {kernelBridgePlugin} from './src/server/kernelBridgePlugin';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), kernelBridgePlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -17,13 +18,6 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
-      proxy: {
-        '/agentic-os-api': {
-          target: 'http://127.0.0.1:8001',
-          changeOrigin: true,
-          rewrite: (path: string) => path.replace(/^\/agentic-os-api/, ''),
-        },
-      },
     },
   };
 });

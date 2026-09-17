@@ -10,7 +10,7 @@
 `feat(runtime-discovery): implement runtime discovery, kernel v2, WebSocket streaming, REST APIs & DI container improvements`
 
 # Remote Branch
-`origin/main` (https://github.com/rachidSabah/AgenticosHybrid.git)
+`origin/main` (https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA.git)
 
 # Completed Milestones
 
@@ -52,7 +52,7 @@
 - **Ruff Lint/Format**: 100% Clean
 - **Build Status**: Passing / Clean
 - **Branch**: `main`
-- **Remote Status**: Synchronized with GitHub `origin/main` (https://github.com/rachidSabah/AgenticosHybrid.git)
+- **Remote Status**: Synchronized with GitHub `origin/main` (https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA.git)
 
 # Next Recommended Task
 

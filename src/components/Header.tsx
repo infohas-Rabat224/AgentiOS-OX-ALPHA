@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, onExpor
                 </h1>
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <GitBranch className="w-3 h-3 mr-1" />
-                  rachidSabah/AgenticosHybrid
+                  infohas-Rabat224/AgentiOS-OX-ALPHA
                 </span>
               </div>
               <p className="text-xs text-slate-500">

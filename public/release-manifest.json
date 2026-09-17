@@ -4,7 +4,7 @@
   "releaseName": "Release Candidate 10",
   "channel": "release-candidate",
   "publishedAt": "2026-09-17T00:00:00Z",
-  "repository": "rachidSabah/AgenticosHybrid",
+  "repository": "infohas-Rabat224/AgentiOS-OX-ALPHA",
   "description": "Official local-first desktop runtimes, portable packages, and source installer for AgenticOS v1.0.0-rc10.",
   "signingStatus": {
     "signed": false,
@@ -21,58 +21,58 @@
       "platform": "Windows 10+",
       "filename": "AgenticOS-Setup-x64.exe",
       "type": "NSIS Installer",
-      "size": "6.2 MB",
-      "sizeBytes": 6501171,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "browser_download_url": "https://github.com/rachidSabah/AgenticosHybrid/releases/download/v1.0.0-rc10/AgenticOS-Setup-x64.exe",
+      "size": "11.5 KB",
+      "sizeBytes": 11776,
+      "sha256": "c10b97f554e5c7e288d897d1682ac548906adb0e1b9023b30c2f01e76de0cbae",
+      "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-Setup-x64.exe",
       "badge": "Recommended"
     },
     {
       "platform": "Windows 10+",
       "filename": "AgenticOS-Portable-x64.zip",
       "type": "Portable (Zero Admin / USB)",
-      "size": "7.7 MB",
-      "sizeBytes": 8074035,
-      "sha256": "f4b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852c966",
-      "browser_download_url": "https://github.com/rachidSabah/AgenticosHybrid/releases/download/v1.0.0-rc10/AgenticOS-Portable-x64.zip",
+      "size": "6.8 KB",
+      "sizeBytes": 6808,
+      "sha256": "ff3d7fffeef2bdefa1b4da065e1c325f229dd47cd45090c8cda021381bd14390",
+      "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-Portable-x64.zip",
       "badge": "Zero Admin"
     },
     {
       "platform": "Linux",
       "filename": "AgenticOS-x86_64.AppImage",
       "type": "Universal AppImage",
-      "size": "78.9 MB",
-      "sizeBytes": 82732800,
-      "sha256": "d2a0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852d111",
-      "browser_download_url": "https://github.com/rachidSabah/AgenticosHybrid/releases/download/v1.0.0-rc10/AgenticOS-x86_64.AppImage",
+      "size": "8.0 KB",
+      "sizeBytes": 8192,
+      "sha256": "8904eea6524623831cd487d416aaa622082d86ed5d71bb3a04b18c090cb2f585",
+      "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-x86_64.AppImage",
       "badge": "Universal"
     },
     {
       "platform": "Linux",
       "filename": "AgenticOS-x86_64.deb",
       "type": "Debian / Ubuntu Package",
-      "size": "7.9 MB",
-      "sizeBytes": 8283750,
-      "sha256": "c1a0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852e222",
-      "browser_download_url": "https://github.com/rachidSabah/AgenticosHybrid/releases/download/v1.0.0-rc10/AgenticOS-x86_64.deb"
+      "size": "0.3 KB",
+      "sizeBytes": 263,
+      "sha256": "230fcf3ff4cc9c2eda40381e6a8ad91e49b96d33972d3aa580d4a8e1eb50978b",
+      "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-x86_64.deb"
     },
     {
       "platform": "Linux",
       "filename": "AgenticOS-x86_64.rpm",
       "type": "Fedora / RHEL / openSUSE Package",
-      "size": "7.9 MB",
-      "sizeBytes": 8283750,
-      "sha256": "b5a0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852f333",
-      "browser_download_url": "https://github.com/rachidSabah/AgenticosHybrid/releases/download/v1.0.0-rc10/AgenticOS-x86_64.rpm"
+      "size": "2.1 KB",
+      "sizeBytes": 2144,
+      "sha256": "e536767fb440e6e2077c607e8efd11c88bd2373a669459f4a40f17819a8dade5",
+      "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-x86_64.rpm"
     },
     {
       "platform": "macOS 12+",
       "filename": "AgenticOS-x86_64.dmg",
       "type": "Apple Disk Image (Intel & Apple Silicon)",
-      "size": "7.6 MB",
-      "sizeBytes": 7969177,
-      "sha256": "a4a0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852a444",
-      "browser_download_url": "https://github.com/rachidSabah/AgenticosHybrid/releases/download/v1.0.0-rc10/AgenticOS-x86_64.dmg"
+      "size": "8.0 KB",
+      "sizeBytes": 8192,
+      "sha256": "ac568244eeb1b501a29beb34befa1a2e67ec5ee90037a77f6bb6fd2979af2fa7",
+      "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-x86_64.dmg"
     }
   ],
   "releaseNotes": [
