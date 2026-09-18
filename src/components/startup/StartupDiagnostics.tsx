@@ -22,7 +22,7 @@ import {
   XCircle,
   EyeOff
 } from 'lucide-react';
-import { tauriBridge, StartupDiagnostics as DiagData } from '../../services/tauriBridge';
+import { tauriBridge, StartupDiagnostics as DiagData, StartupMetadata } from '../../services/tauriBridge';
 
 export interface StartupDiagnosticsProps {
   /** Optional callback when startup is confirmed healthy or user bypasses */
@@ -31,8 +31,12 @@ export interface StartupDiagnosticsProps {
   onDismiss?: () => void;
   /** Optional callback when retry succeeds */
   onRetrySuccess?: () => void;
+  /** Callback fired whenever the startup status changes */
+  onStatusChange?: (status: 'CHECKING' | 'READY' | 'FAILED' | 'RETRYING') => void;
   /** When true, renders as an inline dashboard card instead of full-screen overlay */
   embedded?: boolean;
+  /** When true, renders as the primary main app root fallback screen */
+  isRootFallback?: boolean;
   /** Force an error state for testing/QA */
   simulateFailure?: boolean;
 }
@@ -56,10 +60,20 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
   onReady,
   onDismiss,
   onRetrySuccess,
+  onStatusChange,
   embedded = false,
+  isRootFallback = false,
   simulateFailure = false,
 }) => {
-  const [status, setStatus] = useState<'CHECKING' | 'READY' | 'FAILED' | 'RETRYING'>('CHECKING');
+  const [status, setInternalStatus] = useState<'CHECKING' | 'READY' | 'FAILED' | 'RETRYING'>('CHECKING');
+
+  const setStatus = useCallback((newStatus: 'CHECKING' | 'READY' | 'FAILED' | 'RETRYING') => {
+    setInternalStatus(newStatus);
+    if (onStatusChange) {
+      onStatusChange(newStatus);
+    }
+  }, [onStatusChange]);
+
   const [isHealthy, setIsHealthy] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'trace' | 'compatibility' | 'subsystems'>('overview');
@@ -73,8 +87,9 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
   const [backendPid, setBackendPid] = useState<number | null>(null);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [logPath, setLogPath] = useState<string>(
-    'C:\\Users\\Developer\\AppData\\Local\\AgenticOS\\logs\\kernel.log'
+    'C:\\Users\\Developer\\AppData\\Local\\AgenticOS\\logs\\startup.log'
   );
+  const [startupMetadata, setStartupMetadata] = useState<StartupMetadata | null>(null);
   const [kernelBinaryPath, setKernelBinaryPath] = useState<string>(
     'C:\\Users\\Developer\\AppData\\Local\\AgenticOS\\bin\\agenticos-kernel.exe'
   );
@@ -133,6 +148,22 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
     setStatus('CHECKING');
     setPort8001Status('CHECKING');
     evaluateCompatibility();
+
+    // Fetch early startup metadata captured by Rust StartupDiagnosticsLogger
+    try {
+      const meta = await tauriBridge.getStartupMetadata();
+      if (meta) {
+        setStartupMetadata(meta);
+        if (meta.log_path) {
+          setLogPath(meta.log_path);
+        }
+        if (meta.host_pid) {
+          setBackendPid(meta.host_pid);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch startup metadata:', e);
+    }
 
     if (simulateFailure) {
       setTimeout(() => {
@@ -199,11 +230,16 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
         if (onRetrySuccess) {
           onRetrySuccess();
         }
+        // Auto-reveal main application after confirming kernel health
+        setTimeout(() => {
+          setBypassScreen(true);
+        }, 450);
       } else {
         // Degraded or unreachable
         setStatus('FAILED');
         setIsHealthy(false);
         setPort8001Status('UNREACHABLE');
+        setBypassScreen(false);
         setErrorReason(
           `Port 8001 health check returned HTTP ${health.http_code || 0} (${health.status}).`
         );
@@ -215,13 +251,57 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
       setStatus('FAILED');
       setIsHealthy(false);
       setPort8001Status('UNREACHABLE');
+      setBypassScreen(false);
       setErrorReason(err?.message || 'Kernel socket connection refused.');
       setDiagnosticTrace(`Exception caught during startup probe: ${String(err)}`);
     }
-  }, [evaluateCompatibility, simulateFailure, onReady, logPath]);
+  }, [evaluateCompatibility, simulateFailure, onReady, onRetrySuccess, logPath]);
 
+  // Initial diagnostics probe and Tauri event subscriptions
   useEffect(() => {
     runDiagnostics();
+
+    let unlistenReady: (() => void) | undefined;
+    let unlistenFailed: (() => void) | undefined;
+    let unlistenCrashed: (() => void) | undefined;
+
+    const setupListeners = async () => {
+      unlistenReady = await tauriBridge.onStartupReady((diag) => {
+        setStatus('READY');
+        setIsHealthy(true);
+        setPort8001Status('ONLINE');
+        if (diag?.backend_pid) setBackendPid(diag.backend_pid);
+        if (diag?.kernel_binary_path) setKernelBinaryPath(diag.kernel_binary_path);
+        if (diag?.log_path) setLogPath(diag.log_path);
+        if (diag?.subsystems) setSubsystems(diag.subsystems);
+        setTimeout(() => setBypassScreen(true), 400);
+      });
+
+      unlistenFailed = await tauriBridge.onStartupFailed((diag) => {
+        setStatus('FAILED');
+        setIsHealthy(false);
+        setPort8001Status('UNREACHABLE');
+        setBypassScreen(false);
+        if (diag?.error_reason) setErrorReason(diag.error_reason);
+        if (diag?.diagnostic_trace) setDiagnosticTrace(diag.diagnostic_trace);
+      });
+
+      unlistenCrashed = await tauriBridge.onKernelCrashed((reason) => {
+        setStatus('FAILED');
+        setIsHealthy(false);
+        setPort8001Status('UNREACHABLE');
+        setBypassScreen(false);
+        setErrorReason(reason);
+      });
+    };
+
+    setupListeners();
+
+    return () => {
+      if (unlistenReady) unlistenReady();
+      if (unlistenFailed) unlistenFailed();
+      if (unlistenCrashed) unlistenCrashed();
+    };
   }, [runDiagnostics]);
 
   const handleRetry = async () => {
@@ -239,15 +319,23 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
   const handleCopyDiagnostic = async () => {
     const reportText = [
       '================================================================',
-      'AGENTICOS STARTUP & COMPATIBILITY DIAGNOSTIC TRACE',
+      'AGENTICOS STARTUP & COMPATIBILITY FORENSIC DIAGNOSTIC TRACE',
       '================================================================',
-      `Timestamp:         ${new Date().toISOString()}`,
+      `Session Timestamp: ${startupMetadata?.timestamp ?? new Date().toISOString()}`,
+      `Application:       ${startupMetadata?.app_name ?? 'AgenticOS Desktop'} v${startupMetadata?.app_version ?? '1.0.0-rc10'}`,
+      `Host Architecture: ${startupMetadata?.architecture ?? compatibility.arch}`,
+      `Operating System:  ${startupMetadata?.os ?? compatibility.os} (${startupMetadata?.os_family ?? 'windows'})`,
+      `Host Process PID:  ${startupMetadata?.host_pid ?? 'UNKNOWN'}`,
+      `Target Triple:     ${startupMetadata?.target_triple ?? 'x86_64-pc-windows-msvc'}`,
       `Kernel Status:     ${status}`,
       `Port 8001 Status:  ${port8001Status} (${port8001Latency}ms latency, HTTP ${httpCode})`,
       `Backend PID:       ${backendPid ?? 'UNAVAILABLE / EXITED'}`,
+      `Executable Path:   ${startupMetadata?.exe_path ?? 'N/A'}`,
+      `Working Dir:       ${startupMetadata?.current_working_dir ?? 'N/A'}`,
+      `Local AppData:     ${startupMetadata?.localappdata_dir ?? 'N/A'}`,
       `Kernel Binary:     ${kernelBinaryPath}`,
-      `Log File:          ${logPath}`,
-      `Error Reason:      ${errorReason ?? 'None (Healthy)'}`,
+      `Startup Log File:  ${logPath}`,
+      `Error / Exit Code: ${errorReason ?? 'None (Healthy Session)'}`,
       '----------------------------------------------------------------',
       'System Compatibility:',
       `  OS:              ${compatibility.os} ${compatibility.osVersion}`,
@@ -279,12 +367,12 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
   };
 
   // If already ready and not embedded, and not in failure mode, don't block the screen
-  if (!embedded && status === 'READY' && !simulateFailure && bypassScreen) {
+  if (!isRootFallback && !embedded && status === 'READY' && !simulateFailure && bypassScreen) {
     return null;
   }
 
   // Floating status indicator when minimized or healthy in full-app mode
-  if (!embedded && (status === 'READY' || bypassScreen)) {
+  if (!isRootFallback && !embedded && (status === 'READY' || bypassScreen)) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
         <button
@@ -304,7 +392,9 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
     );
   }
 
-  const containerClasses = embedded
+  const containerClasses = isRootFallback
+    ? 'min-h-screen w-full bg-[#060911] flex items-center justify-center p-4 sm:p-8 text-slate-200 overflow-y-auto'
+    : embedded
     ? 'w-full bg-[#0b0f19] border border-slate-800 rounded-2xl p-5 text-slate-200 shadow-xl'
     : 'fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-[#060911]/95 backdrop-blur-md overflow-y-auto';
 
@@ -559,6 +649,24 @@ export const StartupDiagnostics: React.FC<StartupDiagnosticsProps> = ({
 
               {/* Path and Binary Information */}
               <div className="p-4 rounded-xl bg-black/40 border border-slate-800/80 font-mono text-[11px] space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-300">
+                  <span className="text-slate-500">App Version & Architecture:</span>
+                  <span className="text-purple-300 font-mono text-right">
+                    {startupMetadata?.app_name || 'AgenticOS'} v{startupMetadata?.app_version || '1.0.0-rc10'} ({startupMetadata?.architecture || compatibility.arch})
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-300">
+                  <span className="text-slate-500">Host Executable Path:</span>
+                  <span className="text-slate-200 font-mono text-right truncate max-w-lg">
+                    {startupMetadata?.exe_path || 'AgenticOS.exe'}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-300">
+                  <span className="text-slate-500">Working Directory:</span>
+                  <span className="text-slate-300 font-mono text-right truncate max-w-lg">
+                    {startupMetadata?.current_working_dir || 'Installation Dir'}
+                  </span>
+                </div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-300">
                   <span className="text-slate-500">Kernel Binary Path:</span>
                   <span className="text-cyan-300 font-mono text-right truncate max-w-lg">

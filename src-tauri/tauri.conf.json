@@ -67,21 +67,25 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../AgenticosHybrid/**/*",
-      "../python/**/*",
-      "../build-windows/bin/agenticos-kernel.exe",
-      "../build-windows/bin/AgenticOS.exe",
-      "../start-agenticos.bat"
-    ],
+    "resources": {
+      "../python/": "python/",
+      "../AgenticosHybrid/": "AgenticosHybrid/",
+      "../build-windows/bin/agenticos-kernel.exe": "bin/agenticos-kernel.exe",
+      "../build-windows/bin/AgenticOS.exe": "bin/AgenticOS.exe",
+      "../start-agenticos.bat": "start-agenticos.bat"
+    },
     "windows": {
       "nsis": {
         "installerName": "AgenticOS-Setup-x64.exe",
+        "installerIcon": "icons/icon.ico",
         "headerImage": null,
         "sidebarImage": null,
         "installMode": "currentUser",
+        "startMenuFolder": "AgenticOS",
         "languages": ["English"],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "compression": "lzma",
+        "template": "../build-windows/installer.nsi"
       },
       "wix": {
         "language": "en-US"

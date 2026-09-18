@@ -304,7 +304,7 @@ export class TauriBridge {
     return {
       pid: 29480,
       binary_path: 'C:\\Users\\Developer\\AppData\\Local\\AgenticOS\\bin\\agenticos-kernel.exe',
-      log_path: 'C:\\Users\\Developer\\AppData\\Local\\AgenticOS\\logs\\kernel.log',
+      log_path: 'C:\\Users\\Developer\\AppData\\Local\\AgenticOS\\logs\\startup.log',
       status: 'RUNNING',
       started_at: new Date().toISOString(),
     };
@@ -363,6 +363,102 @@ export class TauriBridge {
     }
     return report;
   }
+
+  /**
+   * Listen for kernel ready event from Rust runtime
+   */
+  public async onStartupReady(callback: (payload: any) => void): Promise<() => void> {
+    if (this.isTauriRuntime()) {
+      try {
+        const tauriEvent = (window as any).__TAURI__?.event || (window as any).__TAURI_INTERNALS__?.event;
+        if (tauriEvent?.listen) {
+          return await tauriEvent.listen('agenticos://startup_ready', (event: any) => callback(event.payload));
+        }
+      } catch (err) {
+        console.warn('[TauriBridge] onStartupReady bind failed:', err);
+      }
+    }
+    return () => {};
+  }
+
+  /**
+   * Listen for kernel startup failure event from Rust runtime
+   */
+  public async onStartupFailed(callback: (payload: any) => void): Promise<() => void> {
+    if (this.isTauriRuntime()) {
+      try {
+        const tauriEvent = (window as any).__TAURI__?.event || (window as any).__TAURI_INTERNALS__?.event;
+        if (tauriEvent?.listen) {
+          return await tauriEvent.listen('agenticos://startup_failed', (event: any) => callback(event.payload));
+        }
+      } catch (err) {
+        console.warn('[TauriBridge] onStartupFailed bind failed:', err);
+      }
+    }
+    return () => {};
+  }
+
+  /**
+   * Listen for kernel crash event from Rust runtime
+   */
+  public async onKernelCrashed(callback: (reason: string) => void): Promise<() => void> {
+    if (this.isTauriRuntime()) {
+      try {
+        const tauriEvent = (window as any).__TAURI__?.event || (window as any).__TAURI_INTERNALS__?.event;
+        if (tauriEvent?.listen) {
+          return await tauriEvent.listen('agenticos://kernel_crashed', (event: any) => callback(event.payload));
+        }
+      } catch (err) {
+        console.warn('[TauriBridge] onKernelCrashed bind failed:', err);
+      }
+    }
+    return () => {};
+  }
+
+  /**
+   * Fetches real startup metadata captured by Rust StartupDiagnosticsLogger immediately upon launch
+   */
+  public async getStartupMetadata(): Promise<StartupMetadata> {
+    if (this.isTauriRuntime()) {
+      try {
+        const invoke = (window as any).__TAURI_INTERNALS__?.invoke || (window as any).__TAURI__?.core?.invoke;
+        if (invoke) {
+          return await invoke('get_startup_metadata');
+        }
+      } catch (err) {
+        console.warn('[TauriBridge] get_startup_metadata invoke failed:', err);
+      }
+    }
+    return {
+      timestamp: new Date().toISOString(),
+      app_name: 'AgenticOS Desktop Mission Control',
+      app_version: '1.0.0-rc10',
+      os: 'windows',
+      os_family: 'windows',
+      architecture: 'x86_64',
+      exe_path: 'C:\\Program Files\\AgenticOS\\AgenticOS.exe',
+      current_working_dir: 'C:\\Program Files\\AgenticOS',
+      localappdata_dir: 'C:\\Users\\Default\\AppData\\Local',
+      log_path: 'C:\\Users\\Default\\AppData\\Local\\AgenticOS\\logs\\startup.log',
+      host_pid: 14220,
+      target_triple: 'x86_64-pc-windows-msvc',
+    };
+  }
+}
+
+export interface StartupMetadata {
+  timestamp: string;
+  app_name: string;
+  app_version: string;
+  os: string;
+  os_family: string;
+  architecture: string;
+  exe_path: string;
+  current_working_dir: string;
+  localappdata_dir: string;
+  log_path: string;
+  host_pid: number;
+  target_triple: string;
 }
 
 export interface StartupDiagnostics {

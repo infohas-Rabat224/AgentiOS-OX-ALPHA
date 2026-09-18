@@ -16,16 +16,42 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('brain');
   const [auditSubTab, setAuditSubTab] = useState<'overview' | 'deep-dive' | 'benchmarks' | 'blueprints' | 'diffs' | 'repo'>('overview');
   const [selectedBottleneck, setSelectedBottleneck] = useState<BottleneckItem | null>(BOTTLENECK_ITEMS[0]);
+  const [startupStatus, setStartupStatus] = useState<'CHECKING' | 'READY' | 'FAILED' | 'RETRYING'>('CHECKING');
+  const [bypassFallback, setBypassFallback] = useState<boolean>(false);
 
   const handleSelectBottleneck = (item: BottleneckItem) => {
     setSelectedBottleneck(item);
     setAuditSubTab('deep-dive');
   };
 
+  // Main app root fallback: Provide visible, transparent error reporting if startup fails
+  if (startupStatus === 'FAILED' && !bypassFallback) {
+    return (
+      <StartupErrorBoundary>
+        <StartupDiagnostics
+          isRootFallback={true}
+          onStatusChange={setStartupStatus}
+          onDismiss={() => setBypassFallback(true)}
+          onRetrySuccess={() => {
+            setStartupStatus('READY');
+            setBypassFallback(true);
+          }}
+        />
+      </StartupErrorBoundary>
+    );
+  }
+
   return (
     <StartupErrorBoundary>
-      {/* Active Startup & Lifecycle Diagnostics Supervisor (Requirement 11) */}
-      <StartupDiagnostics />
+      {/* Active Startup & Lifecycle Diagnostics Supervisor */}
+      <StartupDiagnostics
+        onStatusChange={setStartupStatus}
+        onDismiss={() => setBypassFallback(true)}
+        onRetrySuccess={() => {
+          setStartupStatus('READY');
+          setBypassFallback(true);
+        }}
+      />
 
       <MissionControlShell activeTab={activeTab} setActiveTab={setActiveTab}>
         {/* Forensic Audit & Optimization Sub-views embedded under the Audit tab */}

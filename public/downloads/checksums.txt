@@ -1,3 +1,3 @@
-fdb4e1438426d23552cb841e1875be201948c2d4851df7e5e39259b405da1569  AgenticOS-Setup-x64.exe
+2b7c8ae9e29e385c805f0c7059b4ea58a5b246f86ea0c5404a8d5f59ccafdeb3  AgenticOS-Setup-x64.exe
 fd8e9ae4df97d0cfcdea06f1616638bf308771eaf5fdafe0ce7b6fc0d42e99c8  AgenticOS-Portable-x64.zip
 7696a967357f5a3b616d64171d691771aa4000b4f12f0cb8e9a1a71987cdf7c3  AgenticOS.exe
