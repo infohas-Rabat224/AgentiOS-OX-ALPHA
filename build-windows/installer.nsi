@@ -72,7 +72,11 @@ Section "MainSection" SEC01
     SetOutPath "$INSTDIR\AgenticosHybrid"
     File /r /x .git /x node_modules /x __pycache__ "../AgenticosHybrid\*.*"
 
-    ; 4. Prepare logs, workspace, and config directories
+    ; 4. Bundled Python Runtime Environment
+    SetOutPath "$INSTDIR\python"
+    File /r /x .git /x __pycache__ "../python\*.*"
+
+    ; 5. Prepare logs, workspace, and config directories
     CreateDirectory "$INSTDIR\logs"
     CreateDirectory "$INSTDIR\workspace"
     CreateDirectory "$INSTDIR\security"
@@ -117,6 +121,7 @@ Section Uninstall
     ; Remove Directories
     RMDir /r "$INSTDIR\dist"
     RMDir /r "$INSTDIR\AgenticosHybrid"
+    RMDir /r "$INSTDIR\python"
     RMDir /r "$INSTDIR\workspace"
 
     ; Try removing root directory if empty (leaves user logs/security)

@@ -4,40 +4,52 @@ title AgenticOS Autonomous Multi-Agent Engine
 cd /d "%~dp0"
 
 echo =================================================================
-echo                AgenticOS Hybrid Engine & Mission Control
+echo                AgenticOS Desktop Mission Control
 echo =================================================================
 echo.
 
 if not exist logs mkdir logs
 
-echo [1/2] Starting AgenticOS Live Kernel on port 8001...
-where python >nul 2>&1
-if %errorlevel% equ 0 (
-    start /b "" python -m uvicorn agentic_os.kernel:app --host 127.0.0.1 --port 8001 > logs\kernel.log 2>&1
-) else (
-    echo [NOTICE] Python not in PATH, running embedded mock kernel daemon.
+if exist "%~dp0AgenticOS.exe" (
+    echo Launching AgenticOS Native Desktop Application...
+    start "" "%~dp0AgenticOS.exe"
+    goto :done
 )
 
-echo [2/2] Starting Mission Control Interface on http://localhost:3000...
-where npm >nul 2>&1
-if %errorlevel% equ 0 (
-    start /b "" npm run dev > logs\mission-control.log 2>&1
+if exist "%~dp0bin\AgenticOS.exe" (
+    echo Launching AgenticOS Native Desktop Application...
+    start "" "%~dp0bin\AgenticOS.exe"
+    goto :done
+)
+
+echo [1/2] Starting AgenticOS Native Kernel...
+if exist "%~dp0agenticos-kernel.exe" (
+    start /b "" "%~dp0agenticos-kernel.exe" > logs\kernel.log 2>&1
+) else if exist "%~dp0bin\agenticos-kernel.exe" (
+    start /b "" "%~dp0bin\agenticos-kernel.exe" > logs\kernel.log 2>&1
+) else if exist "%~dp0python\python.exe" (
+    set "PYTHONPATH=%~dp0AgenticosHybrid\src"
+    start /b "" "%~dp0python\python.exe" -m agentic_os serve --host 127.0.0.1 --port 8001 > logs\kernel.log 2>&1
 ) else (
-    where npx >nul 2>&1
+    where python >nul 2>&1
     if %errorlevel% equ 0 (
-        start /b "" npx serve dist -l 3000 > logs\mission-control.log 2>&1
+        set "PYTHONPATH=%~dp0AgenticosHybrid\src"
+        start /b "" python -m agentic_os serve --host 127.0.0.1 --port 8001 > logs\kernel.log 2>&1
+    ) else (
+        echo [ERROR] No AgenticOS kernel binary or Python runtime found.
     )
 )
 
 timeout /t 2 /nobreak >nul
-echo Launching browser interface...
-start http://localhost:3000
+echo [2/2] Opening Mission Control Interface...
+start http://127.0.0.1:3000
 
+:done
 echo.
 echo =================================================================
 echo AgenticOS is active!
 echo Kernel Daemon:     http://127.0.0.1:8001
-echo Mission Control:   http://localhost:3000
+echo Mission Control:   http://127.0.0.1:3000
 echo Logs Directory:    %~dp0logs
 echo =================================================================
-pause
+timeout /t 3 /nobreak >nul

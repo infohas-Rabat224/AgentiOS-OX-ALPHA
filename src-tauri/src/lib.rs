@@ -1,56 +1,95 @@
 pub mod commands;
+pub mod logger;
 pub mod services;
 
 use std::sync::Arc;
-use tauri::{Manager, Emitter};
-pub use services::{KernelService, StartupDiagnostics};
+use tauri::{AppHandle, Emitter, Manager};
+
+pub use logger::{DiagnosticRecord, Logger};
+pub use services::{HealthCheckService, KernelHealthPayload, KernelService, StartupDiagnostics};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let logger = Logger::global();
     let kernel_service = Arc::new(KernelService::new());
     let service_clone = kernel_service.clone();
 
-    tauri::Builder::default()
+    logger.info("INIT", "", "Starting AgenticOS Tauri Desktop Application runtime supervisor");
+
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(kernel_service)
         .setup(move |app| {
             let app_handle = app.handle().clone();
             let service = service_clone.clone();
 
-            // Run backend launch and health-check loop in background task
+            // Run backend launch and automated health-check loop in background task
             tauri::async_runtime::spawn(async move {
-                service.append_log("Tauri setup hook initialized. Starting AgenticOS backend kernel...");
+                let install_dir = service.resolve_installation_path(Some(&app_handle));
+                let install_str = install_dir.to_string_lossy().to_string();
 
-                // 1. Launch kernel binary
+                Logger::global().info(
+                    "STARTUP",
+                    &install_str,
+                    "Tauri setup hook initialized. Spawning backend process with controlled working directory...",
+                );
+
+                // 1. Launch backend kernel binary with controlled working directory set to installation path
                 match service.start_kernel(Some(&app_handle)) {
                     Ok(pid) => {
-                        service.append_log(&format!("Kernel process started (PID: {}). Starting health-check loop...", pid));
+                        Logger::global().info(
+                            "RUNNING",
+                            &install_str,
+                            &format!("Backend child process successfully spawned with PID {}. Initiating automated health check...", pid),
+                        );
                     }
                     Err(e) => {
-                        service.append_log(&format!("Kernel startup failed: {}. Notifying frontend.", e));
+                        Logger::global().error(
+                            "FAILED",
+                            &install_str,
+                            &format!("Kernel backend process launch failed: {}. Emitting startup_failed to UI.", e),
+                            None,
+                        );
                         let diag = service.get_diagnostics();
                         let _ = app_handle.emit("agenticos://startup_failed", &diag);
+                        if let Some(main_window) = app_handle.get_webview_window("main") {
+                            let _ = main_window.show();
+                        }
                         return;
                     }
                 }
 
-                // 2. Health check loop before rendering/revealing main window
-                let is_healthy = service.run_health_check_loop(15).await;
+                // 2. Automated health-check service polling 127.0.0.1:8001/healthz and validating schema
+                let health_service = HealthCheckService::new(
+                    Some("http://127.0.0.1:8001/healthz".to_string()),
+                    Some(15),
+                );
+
+                let is_healthy = health_service.poll_until_ready(&app_handle, &install_str).await;
                 let diag = service.get_diagnostics();
 
                 if is_healthy {
-                    service.append_log("Backend kernel healthy and ready. Revealing main window.");
+                    Logger::global().info(
+                        "READY",
+                        &install_str,
+                        "Backend kernel healthy and schema validated. Signaling UI and revealing main window.",
+                    );
+                    let _ = app_handle.emit("agenticos://startup_ready", &diag);
                     if let Some(main_window) = app_handle.get_webview_window("main") {
                         let _ = main_window.show();
                         let _ = main_window.set_focus();
                     }
-                    let _ = app_handle.emit("agenticos://startup_ready", &diag);
                 } else {
-                    service.append_log("Health check loop timed out. Showing failure UI with diagnostics.");
+                    Logger::global().error(
+                        "FAILED",
+                        &install_str,
+                        "Health check loop timed out or schema validation failed. Revealing diagnostic recovery screen in UI.",
+                        None,
+                    );
+                    let _ = app_handle.emit("agenticos://startup_failed", &diag);
                     if let Some(main_window) = app_handle.get_webview_window("main") {
                         let _ = main_window.show();
                     }
-                    let _ = app_handle.emit("agenticos://startup_failed", &diag);
                 }
             });
 
@@ -68,6 +107,22 @@ pub fn run() {
             commands::kernel::open_diagnostic_log,
             commands::kernel::copy_diagnostic_report,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running AgenticOS Tauri desktop application");
+        .build(tauri::generate_context!())
+        .expect("error while building AgenticOS Tauri desktop application");
+
+    // Main event loop: Ensures monitored child process is cleaned up on application exit
+    let cleanup_service = app.state::<Arc<KernelService>>().inner().clone();
+    app.run(move |_app_handle, event| {
+        match event {
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                Logger::global().info("SHUTDOWN", "", "Application exit requested. Cleaning up child process...");
+                cleanup_service.stop_kernel();
+            }
+            tauri::RunEvent::Exit => {
+                Logger::global().info("SHUTDOWN", "", "Application exit triggered. Ensuring backend process is terminated.");
+                cleanup_service.stop_kernel();
+            }
+            _ => {}
+        }
+    });
 }

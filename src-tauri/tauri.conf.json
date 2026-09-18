@@ -70,7 +70,9 @@
     "resources": [
       "../AgenticosHybrid/**/*",
       "../python/**/*",
-      "../build-windows/bin/agenticos-kernel.exe"
+      "../build-windows/bin/agenticos-kernel.exe",
+      "../build-windows/bin/AgenticOS.exe",
+      "../start-agenticos.bat"
     ],
     "windows": {
       "nsis": {

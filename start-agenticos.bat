@@ -27,12 +27,16 @@ if exist "%~dp0agenticos-kernel.exe" (
     start /b "" "%~dp0agenticos-kernel.exe" > logs\kernel.log 2>&1
 ) else if exist "%~dp0bin\agenticos-kernel.exe" (
     start /b "" "%~dp0bin\agenticos-kernel.exe" > logs\kernel.log 2>&1
+) else if exist "%~dp0python\python.exe" (
+    set "PYTHONPATH=%~dp0AgenticosHybrid\src"
+    start /b "" "%~dp0python\python.exe" -m agentic_os serve --host 127.0.0.1 --port 8001 > logs\kernel.log 2>&1
 ) else (
     where python >nul 2>&1
     if %errorlevel% equ 0 (
+        set "PYTHONPATH=%~dp0AgenticosHybrid\src"
         start /b "" python -m agentic_os serve --host 127.0.0.1 --port 8001 > logs\kernel.log 2>&1
     ) else (
-        echo [ERROR] No AgenticOS kernel binary found.
+        echo [ERROR] No AgenticOS kernel binary or Python runtime found.
     )
 )
 
