@@ -13,26 +13,77 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "AgenticOS — Desktop Mission Control (v1.0.0-rc10)",
         "width": 1440,
         "height": 900,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": ["default"]
+    }
+  },
+  "allowlist": {
+    "all": false,
+    "shell": {
+      "all": false,
+      "execute": true,
+      "open": true
+    },
+    "http": {
+      "all": true,
+      "request": true,
+      "scope": [
+        "http://127.0.0.1:8001/*",
+        "http://localhost:8001/*",
+        "http://127.0.0.1:3000/*",
+        "http://localhost:3000/*"
+      ]
+    },
+    "process": {
+      "all": true,
+      "relaunch": true,
+      "exit": true
+    },
+    "fs": {
+      "all": true,
+      "scope": ["$APPDATA/**", "$LOCALAPPDATA/**", "$RESOURCE/**"]
+    },
+    "path": {
+      "all": true
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": [
+      "../AgenticosHybrid/**/*",
+      "../python/**/*",
+      "../build-windows/bin/agenticos-kernel.exe"
+    ],
+    "windows": {
+      "nsis": {
+        "installerName": "AgenticOS-Setup-x64.exe",
+        "headerImage": null,
+        "sidebarImage": null,
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    }
   }
 }

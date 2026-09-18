@@ -18,7 +18,11 @@ import {
 } from 'lucide-react';
 import { releaseService, UpdateCheckResult, UpdateHistoryEntry } from '../../services/releaseService';
 
-export const DesktopUpdatesView: React.FC = () => {
+interface DesktopUpdatesViewProps {
+  onRefreshBrains?: () => Promise<void>;
+}
+
+export const DesktopUpdatesView: React.FC<DesktopUpdatesViewProps> = () => {
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<'stable' | 'release-candidate' | 'beta' | 'development'>('release-candidate');

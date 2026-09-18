@@ -72,6 +72,7 @@ import { MessagingGatewaysView } from './MessagingGatewaysView';
 import { DownloadInstallModal } from './DownloadInstallModal';
 import { DesktopUpdatesView } from './DesktopUpdatesView';
 import { AgentBindingCenterView } from './AgentBindingCenterView';
+import { StartupDiagnostics } from '../startup/StartupDiagnostics';
 
 interface AppShellProps {
   onShowAuditMatrix?: () => void;
@@ -94,6 +95,7 @@ export const MissionControlShell: React.FC<AppShellProps> = ({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [backendOnline, setBackendOnline] = useState(true);
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [startupDiagModalOpen, setStartupDiagModalOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('agenticos_theme');
@@ -226,6 +228,7 @@ export const MissionControlShell: React.FC<AppShellProps> = ({
     {
       label: 'SYSTEM & DESKTOP',
       items: [
+        { id: 'startup-diagnostics', label: 'Startup Diagnostics', icon: ShieldAlert, hint: 'D', badge: 'Req 11' },
         { id: 'desktop-updates', label: 'Desktop Updates', icon: Download, hint: 'U', badge: 'Safe Engine' },
         { id: 'system-monitor', label: 'System Monitor & Doctor', icon: Gauge, hint: 'S', badge: 'Doctor' },
         { id: 'messaging', label: 'Messaging Gateways', icon: Radio, hint: 'M', badge: 'EventBus' },
@@ -421,6 +424,16 @@ export const MissionControlShell: React.FC<AppShellProps> = ({
               <span className="hidden sm:inline">{isRescanning ? 'Scanning...' : 'Rescan'}</span>
             </button>
 
+            {/* Startup Diagnostics Health Button */}
+            <button
+              onClick={() => setStartupDiagModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface/30 hover:bg-surface/50 border border-border/30 text-[11px] font-medium transition cursor-pointer text-text"
+              title="Startup Diagnostics & Kernel Status (Requirement 11)"
+            >
+              <ShieldAlert size={12} className="text-amber-400" />
+              <span className="hidden md:inline">Startup Health</span>
+            </button>
+
             {/* Download & Install Button */}
             <button
               onClick={() => setDownloadModalOpen(true)}
@@ -535,6 +548,11 @@ export const MissionControlShell: React.FC<AppShellProps> = ({
             )}
 
             {/* DESKTOP GROUP */}
+            {activeTab === 'startup-diagnostics' && (
+              <div className="p-4 max-w-5xl mx-auto h-full overflow-y-auto">
+                <StartupDiagnostics />
+              </div>
+            )}
             {activeTab === 'desktop-diagnostics' && (
               <div className="h-full w-full">
                 <DesktopDiagnosticsView />
@@ -683,6 +701,25 @@ export const MissionControlShell: React.FC<AppShellProps> = ({
         isOpen={downloadModalOpen}
         onClose={() => setDownloadModalOpen(false)}
       />
+
+      {/* Startup Diagnostics Modal (Requirement 11) */}
+      <AnimatePresence>
+        {startupDiagModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            >
+              <StartupDiagnostics
+                onDismiss={() => setStartupDiagModalOpen(false)}
+                onRetrySuccess={() => setStartupDiagModalOpen(false)}
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

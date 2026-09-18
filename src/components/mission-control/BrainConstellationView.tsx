@@ -16,6 +16,7 @@ import { getVendorColor, brainStatusToColor, VENDOR_NAMES } from '../../lib/brai
 interface BrainConstellationViewProps {
   brains: BrainRecord[];
   relationships: BrainRelationship[];
+  selectedBrain?: BrainRecord | null;
   onSelectBrain: (brain: BrainRecord) => void;
 }
 

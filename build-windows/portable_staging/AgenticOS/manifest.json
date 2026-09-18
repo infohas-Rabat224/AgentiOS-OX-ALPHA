@@ -1,0 +1,13 @@
+{
+  "name": "AgenticOS Portable",
+  "version": "1.0.0-rc10",
+  "architecture": "x64",
+  "platform": "windows",
+  "nativeEngine": true,
+  "entrypoint": "AgenticOS.exe",
+  "kernelDaemon": "agenticos-kernel.exe",
+  "ports": {
+    "kernel": 8001,
+    "frontend": 3000
+  }
+}

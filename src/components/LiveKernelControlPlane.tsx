@@ -20,7 +20,11 @@ interface KernelHealth {
   services: Record<string, boolean>;
 }
 
-export const LiveKernelControlPlane: React.FC = () => {
+interface LiveKernelControlPlaneProps {
+  onRefreshBrains?: () => Promise<void>;
+}
+
+export const LiveKernelControlPlane: React.FC<LiveKernelControlPlaneProps> = ({ onRefreshBrains }) => {
   const [health, setHealth] = useState<KernelHealth | null>(null);
   const [metricsText, setMetricsText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);

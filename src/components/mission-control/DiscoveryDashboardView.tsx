@@ -14,7 +14,7 @@ import { BrainRecord } from '../../types/missionControl';
 interface DiscoveryDashboardViewProps {
   brains: BrainRecord[];
   onRescan: () => Promise<void>;
-  isRescanning: boolean;
+  isRescanning?: boolean;
 }
 
 export const DiscoveryDashboardView: React.FC<DiscoveryDashboardViewProps> = ({

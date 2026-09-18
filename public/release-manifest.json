@@ -21,9 +21,9 @@
       "platform": "Windows 10+",
       "filename": "AgenticOS-Setup-x64.exe",
       "type": "NSIS Installer",
-      "size": "11.5 KB",
-      "sizeBytes": 11776,
-      "sha256": "c10b97f554e5c7e288d897d1682ac548906adb0e1b9023b30c2f01e76de0cbae",
+      "size": "954.0 KB",
+      "sizeBytes": 976931,
+      "sha256": "fdf08e0a18501bd440c697595b5a903049655c8939f2c962bf6b3f25f8efb2ae",
       "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-Setup-x64.exe",
       "badge": "Recommended"
     },
@@ -31,9 +31,9 @@
       "platform": "Windows 10+",
       "filename": "AgenticOS-Portable-x64.zip",
       "type": "Portable (Zero Admin / USB)",
-      "size": "6.8 KB",
-      "sizeBytes": 6808,
-      "sha256": "ff3d7fffeef2bdefa1b4da065e1c325f229dd47cd45090c8cda021381bd14390",
+      "size": "2.83 MB",
+      "sizeBytes": 2965852,
+      "sha256": "68870be79f76eaa7e3bcd7fe4cd4dbdcf597442105796bf8abf0e11b8b0cc2e0",
       "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-Portable-x64.zip",
       "badge": "Zero Admin"
     },
@@ -73,6 +73,18 @@
       "sizeBytes": 8192,
       "sha256": "ac568244eeb1b501a29beb34befa1a2e67ec5ee90037a77f6bb6fd2979af2fa7",
       "browser_download_url": "https://github.com/infohas-Rabat224/AgentiOS-OX-ALPHA/releases/download/v1.0.0-rc10/AgenticOS-x86_64.dmg"
+    },
+    {
+      "platform": "windows",
+      "arch": "x64",
+      "format": "exe",
+      "filename": "AgenticOS.exe",
+      "label": "Windows Desktop Standalone (x64)",
+      "size": "429.2 KB",
+      "sizeBytes": 439485,
+      "sha256": "7696a967357f5a3b616d64171d691771aa4000b4f12f0cb8e9a1a71987cdf7c3",
+      "contentType": "application/vnd.microsoft.portable-executable",
+      "isPrimary": false
     }
   ],
   "releaseNotes": [

@@ -1,8 +1,8 @@
 [package]
 name = "agentic-os-desktop"
 version = "1.0.0-rc10"
-description = "AgenticOS Desktop Runtime with Kernel v2 and OmniRoute Matrix"
-authors = ["AgenticOS Core Team"]
+description = "AgenticOS Desktop Mission Control Runtime with Kernel v2 and OmniRoute Matrix"
+authors = ["AgenticOS Open Source Community"]
 edition = "2021"
 
 [lib]
