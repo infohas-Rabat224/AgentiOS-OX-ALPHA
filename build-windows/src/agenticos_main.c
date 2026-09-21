@@ -1165,10 +1165,72 @@ static void cleanup_and_exit(int code) {
 /* =========================================================================
  *   WinMain
  * ========================================================================= */
+
+/* Vectored exception handler — captures crashes before the process dies
+ * and writes a trace to crash.log. This is critical for diagnosing the
+ * STATUS_STACK_BUFFER_OVERRUN (0xC0000409) crash we're seeing in CI. */
+static WCHAR g_crash_log_path[MAX_PATH] = {0};
+
+static LONG CALLBACK crash_handler(PEXCEPTION_POINTERS ep) {
+    if (g_crash_log_path[0] == L'\0') return EXCEPTION_CONTINUE_SEARCH;
+    FILE *f = _wfopen(g_crash_log_path, L"a, ccs=UTF-8");
+    if (!f) return EXCEPTION_CONTINUE_SEARCH;
+
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    WCHAR time_buf[64];
+    wcsftime(time_buf, 64, L"%Y-%m-%dT%H:%M:%S", tm_info);
+
+    DWORD code = ep ? ep->ExceptionRecord->ExceptionCode : 0;
+    void *addr = ep ? ep->ExceptionRecord->ExceptionAddress : NULL;
+
+    fwprintf(f, L"[%s] FATAL EXCEPTION: code=0x%08X address=%p\n",
+             time_buf, (unsigned int)code, addr);
+    if (code == 0xC0000005 /* STATUS_ACCESS_VIOLATION */ && ep) {
+        fwprintf(f, L"  Access violation at address %p, attempting to %s address %p\n",
+                 ep->ExceptionRecord->ExceptionAddress,
+                 ep->ExceptionRecord->ExceptionInformation[0] ? L"write" : L"read",
+                 (void *)ep->ExceptionRecord->ExceptionInformation[1]);
+    }
+    fflush(f);
+    fclose(f);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
     (void)hPrevInstance;
     (void)lpCmdLine;
+
+    /* 0. EARLY CRASH LOGGER — set up crash.log and a vectored exception
+     *    handler BEFORE doing anything else. This is critical for
+     *    debugging the 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN) crash
+     *    we're seeing in CI. */
+    {
+        WCHAR early_log[MAX_PATH];
+        if (SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, early_log) == S_OK) {
+            wcscat_s(early_log, MAX_PATH, L"\\AgenticOS");
+            CreateDirectoryW(early_log, NULL);
+            wcscat_s(early_log, MAX_PATH, L"\\logs");
+            CreateDirectoryW(early_log, NULL);
+            wcscat_s(early_log, MAX_PATH, L"\\crash.log");
+            wcsncpy(g_crash_log_path, early_log, MAX_PATH - 1);
+            g_crash_log_path[MAX_PATH - 1] = L'\0';
+            AddVectoredExceptionHandler(1 /* first */, crash_handler);
+
+            FILE *f = _wfopen(g_crash_log_path, L"a, ccs=UTF-8");
+            if (f) {
+                time_t now = time(NULL);
+                struct tm *tm_info = localtime(&now);
+                WCHAR time_buf[64];
+                wcsftime(time_buf, 64, L"%Y-%m-%dT%H:%M:%S", tm_info);
+                fwprintf(f, L"[%s] AgenticOS.exe v1.0.0-rc10 starting up (PID=%lu)\n",
+                         time_buf, GetCurrentProcessId());
+                fflush(f);
+                fclose(f);
+            }
+        }
+    }
 
     /* 1. Single-instance mutex (multi-launch just focuses existing). */
     HANDLE hMutex = CreateMutexW(NULL, TRUE,
