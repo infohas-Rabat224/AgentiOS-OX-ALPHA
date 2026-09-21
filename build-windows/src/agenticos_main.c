@@ -441,11 +441,15 @@ static void launch_ui(void) {
     WCHAR browser_path[MAX_PATH];
     BOOL is_edge = FALSE;
 
+    write_log(L"launch_ui: entry. reading runtime manifest...");
     /* Ensure the URL reflects any runtime manifest updates. */
     read_runtime_manifest();
+    write_log(L"launch_ui: g_ui_url=%s", g_ui_url);
 
+    write_log(L"launch_ui: calling find_browser()...");
     if (find_browser(browser_path, MAX_PATH, &is_edge)) {
-        write_log(L"Launching dedicated desktop UI via %s", browser_path);
+        write_log(L"launch_ui: find_browser returned TRUE, browser=%s is_edge=%d",
+                  browser_path, is_edge ? 1 : 0);
 
         WCHAR data_dir[MAX_PATH];
         _snwprintf(data_dir, MAX_PATH, L"%s\\webview", g_log_dir);
@@ -460,34 +464,35 @@ static void launch_ui(void) {
             L"--new-window",
             browser_path, g_ui_url, data_dir);
         cmdline[2047] = L'\0';
+        write_log(L"launch_ui: cmdline constructed, length=%d", (int)wcslen(cmdline));
 
         STARTUPINFOW ui_si = {0};
         ui_si.cb = sizeof(ui_si);
         ui_si.dwFlags = STARTF_USESHOWWINDOW;
         ui_si.wShowWindow = SW_SHOWNORMAL;
 
+        write_log(L"launch_ui: calling CreateProcessW...");
         /* IMPORTANT: do NOT add the browser to g_job_object. Chromium sandbox
          * manages its own child jobs; if we tie it to ours, it crashes immediately. */
         if (CreateProcessW(NULL, cmdline, NULL, NULL, FALSE,
                           0, NULL, g_app_dir, &ui_si, &g_ui_pi)) {
-            write_log(L"Browser launched (Launcher PID: %lu)",
+            write_log(L"launch_ui: CreateProcessW succeeded, browser PID=%lu",
                       g_ui_pi.dwProcessId);
-            /* We do NOT mark success yet — verify_browser_alive() will
-             * confirm the process is still running 3 seconds later. */
             return;
         } else {
             DWORD err = GetLastError();
-            write_log(L"CreateProcessW failed for browser (Win32 Error: %lu). "
-                      L"Falling back to ShellExecuteW.", err);
+            write_log(L"launch_ui: CreateProcessW FAILED, error=%lu", err);
             /* Fall through to ShellExecuteW */
         }
     } else {
-        write_log(L"No Edge/Chrome binary located. Falling back to default browser.");
+        write_log(L"launch_ui: find_browser returned FALSE (no Edge/Chrome). Falling back to ShellExecuteW.");
     }
 
+    write_log(L"launch_ui: calling ShellExecuteW for %s", g_ui_url);
     /* Fallback: ask the OS to open the URL with whatever is registered. */
     HINSTANCE h = ShellExecuteW(NULL, L"open", g_ui_url, NULL, NULL, SW_SHOWNORMAL);
     INT_PTR rc = (INT_PTR)h;
+    write_log(L"launch_ui: ShellExecuteW returned %ld", (long)rc);
     if (rc <= 32) {
         /* Note: use %ld not %lld — _snwprintf on MSVC doesn't support
          * the C99 %lld specifier. INT_PTR is 32-bit on x86 and 64-bit
@@ -499,14 +504,12 @@ static void launch_ui(void) {
             (long)rc);
         reason[511] = L'\0';
         set_error(ERR_BROWSER_LAUNCH_FAILED, reason);
+        write_log(L"launch_ui: set ERR_BROWSER_LAUNCH_FAILED, returning.");
         return;
     }
 
-    /* ShellExecuteW succeeded — but we have no handle to verify liveness.
-     * Mark as launched-ok; if it turns out no browser actually opened, the
-     * user will see the splash window with a retry button. */
     g_browser_launched_ok = TRUE;
-    write_log(L"ShellExecuteW opened default browser for %s", g_ui_url);
+    write_log(L"launch_ui: ShellExecuteW succeeded. g_browser_launched_ok=TRUE. Returning.");
 }
 
 /* Verify the browser process is still alive 3 seconds after launch.
