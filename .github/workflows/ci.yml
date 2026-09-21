@@ -241,25 +241,42 @@ jobs:
 
           # Silent install. NSIS silent mode (/S) must be the first arg,
           # and /D= must be the LAST arg with no quotes around the path.
-          # We invoke via cmd.exe /c start to ensure the installer process
-          # is fully detached and PowerShell's WaitForExit can detect when
-          # it has completed. We also pre-create the install directory to
-          # avoid any directory-creation race.
+          # We invoke via Start-Process with -Wait (synchronous) and add
+          # detailed diagnostics including a process list snapshot if
+          # the installer hangs.
           $installer = (Resolve-Path "public\downloads\AgenticOS-Setup-x64.exe").Path
           $instDir = "$env:LOCALAPPDATA\AgenticOS"
           New-Item -ItemType Directory -Force -Path $instDir | Out-Null
 
-          Write-Host "Installing: $installer /S /D=$instDir"
-          # Use cmd.exe /c start to spawn the installer so it doesn't
-          # inherit PowerShell's stdin/stdout handles (which can cause
-          # GUI installers to hang waiting for I/O completion).
-          $p = Start-Process -FilePath "cmd.exe" `
-            -ArgumentList "/c", "`"$installer`" /S /D=$instDir" `
+          Write-Host "Installer path: $installer"
+          Write-Host "Installer size: $((Get-Item $installer).Length) bytes"
+          Write-Host "Install dir: $instDir"
+          Write-Host "Invoking: $installer /S /D=$instDir"
+
+          # Spawn the installer and poll until it exits. We capture the
+          # installer's process tree so we can diagnose if it hangs.
+          $p = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$instDir" `
             -PassThru -WindowStyle Hidden
-          if (-not $p.WaitForExit(120000)) {
-            Write-Host "Installer did not exit within 120s, killing..."
-            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            # Check if files were actually installed despite the hang
+          $exited = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            if ($p.HasExited) { $exited = $true; break }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $exited) {
+            Write-Host "Installer did NOT exit within 120s."
+            Write-Host "Installer process tree:"
+            Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $p.Id -or $_.ProcessId -eq $p.Id } |
+              Format-Table ProcessId, ParentProcessId, Name, CommandLine -AutoSize
+            Write-Host "All nsis-related processes:"
+            Get-Process | Where-Object { $_.Name -match 'nsis|installer|AgenticOS|setup' -or $_.MainWindowTitle -match 'AgenticOS' } | Format-Table Id, Name, MainWindowTitle -AutoSize
+            Write-Host "Files in $instDir :"
+            if (Test-Path $instDir) {
+              Get-ChildItem $instDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 30 FullName, Length | Format-Table -AutoSize
+            }
+            # Kill the installer and any children
+            taskkill /T /F /PID $p.Id 2>$null | Out-Null
+            Stop-Process -Name "AgenticOS-Setup-x64" -Force -ErrorAction SilentlyContinue
+            Stop-Process -Name "AgenticOS" -Force -ErrorAction SilentlyContinue
             if (Test-Path "$instDir\AgenticOS.exe") {
               Write-Host "Files were installed despite installer hang — continuing"
             } else {
@@ -267,7 +284,7 @@ jobs:
               exit 1
             }
           } else {
-            Write-Host "cmd.exe wrapper exit code: $($p.ExitCode)"
+            Write-Host "Installer exit code: $($p.ExitCode)"
           }
           Start-Sleep -Seconds 3
 
