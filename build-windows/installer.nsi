@@ -90,29 +90,21 @@ VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
 ; Pre-install validation
 ; ============================================================================
 Function .onInit
-    ; Require x64 Windows
+    ; Require x64 Windows. In silent mode, just abort without UI.
     ${IfNot} ${RunningX64}
+        IfSilent 0 +3
+        Abort
         MessageBox MB_OK|MB_ICONSTOP \
           "AgenticOS requires a 64-bit edition of Windows.$\r$\n$\r$\nInstallation aborted."
         Abort
     ${EndIf}
 
-    ; Verify the required source binaries exist before we start writing files.
-    ; If these are missing, the build pipeline is broken — abort loudly rather
-    ; than ship a half-built installer that the user will only discover is
-    ; broken after clicking AgenticOS and seeing nothing.
-    IfFileExists "bin\AgenticOS.exe" +3 0
-        MessageBox MB_OK|MB_ICONSTOP \
-          "Build pipeline error: bin\AgenticOS.exe is missing.$\r$\n$\r$\nInstallation aborted."
-        Abort
-    IfFileExists "bin\agenticos-kernel.exe" +3 0
-        MessageBox MB_OK|MB_ICONSTOP \
-          "Build pipeline error: bin\agenticos-kernel.exe is missing.$\r$\n$\r$\nInstallation aborted."
-        Abort
-    IfFileExists "..\dist\index.html" +3 0
-        MessageBox MB_OK|MB_ICONSTOP \
-          "Build pipeline error: ..\dist\index.html is missing.$\r$\n$\r$\n$\r$\nRun 'npm run build' before building the installer.$\r$\nInstallation aborted."
-        Abort
+    ; NOTE: We deliberately do NOT check for source files (bin/AgenticOS.exe,
+    ; dist/index.html, etc.) at runtime. Those checks would use paths
+    ; relative to the installer's CWD, which is different at runtime
+    ; (typically the user's Downloads folder) than at build time
+    ; (the repo root). The NSIS File command itself fails at build time
+    ; if any source file is missing, so this runtime check is redundant.
 FunctionEnd
 
 ; ============================================================================
@@ -174,15 +166,19 @@ Section "MainSection" SEC01
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
 
     ; --- 9. Post-install validation ---
-    ; Verify that every critical file was actually written. If any is missing,
-    ; abort the installation with a clear error rather than declare success.
+    ; Verify that every critical file was actually written. If any is
+    ; missing, abort silently in /S mode (no MessageBox — that would
+    ; hang CI runners). The exit code from a failed install is non-zero.
     IfFileExists "$INSTDIR\AgenticOS.exe" +3 0
+        IfSilent +2
         MessageBox MB_OK|MB_ICONSTOP "Install failed: AgenticOS.exe was not written to $INSTDIR"
         Abort
     IfFileExists "$INSTDIR\agenticos-kernel.exe" +3 0
+        IfSilent +2
         MessageBox MB_OK|MB_ICONSTOP "Install failed: agenticos-kernel.exe was not written to $INSTDIR"
         Abort
     IfFileExists "$INSTDIR\dist\index.html" +3 0
+        IfSilent +2
         MessageBox MB_OK|MB_ICONSTOP "Install failed: dist\index.html was not written to $INSTDIR\dist"
         Abort
 SectionEnd
