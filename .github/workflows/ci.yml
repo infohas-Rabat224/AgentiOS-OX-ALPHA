@@ -247,6 +247,14 @@ jobs:
           # prevent PS from messing with the args.
           $installer = (Resolve-Path "public\downloads\AgenticOS-Setup-x64.exe").Path
           $instDir = "$env:LOCALAPPDATA\AgenticOS"
+
+          # Wipe any previous install to ensure a clean state. The NSIS
+          # installer does NOT uninstall previous versions, and a stale
+          # install dir can cause a supervisor crash on launch.
+          if (Test-Path $instDir) {
+            Write-Host "Cleaning previous install at $instDir"
+            Remove-Item -Recurse -Force $instDir -ErrorAction SilentlyContinue
+          }
           New-Item -ItemType Directory -Force -Path $instDir | Out-Null
 
           Write-Host "Installer path: $installer"
@@ -267,19 +275,8 @@ jobs:
           }
           if (-not $exited) {
             Write-Host "Installer did NOT exit within 180s."
-            Write-Host "cmd.exe PID: $($p.Id)"
-            Write-Host "Child processes:"
-            Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $p.Id } |
-              Format-Table ProcessId, Name, CommandLine -AutoSize
-            Write-Host "All AgenticOS-related processes:"
-            Get-Process | Where-Object { $_.Name -match 'AgenticOS|setup|nsis|installer' } | Format-Table Id, Name, MainWindowTitle -AutoSize
-            Write-Host "Files in $instDir :"
-            if (Test-Path $instDir) {
-              Get-ChildItem $instDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 30 FullName, Length | Format-Table -AutoSize
-            }
             taskkill /T /F /PID $p.Id 2>$null | Out-Null
             Stop-Process -Name "AgenticOS-Setup-x64" -Force -ErrorAction SilentlyContinue
-            Stop-Process -Name "AgenticOS" -Force -ErrorAction SilentlyContinue
             if (Test-Path "$instDir\AgenticOS.exe") {
               Write-Host "Files were installed despite installer hang — continuing"
             } else {
@@ -287,7 +284,21 @@ jobs:
               exit 1
             }
           } else {
-            Write-Host "cmd.exe wrapper exit code: $($p.ExitCode)"
+            $code = $p.ExitCode
+            Write-Host "cmd.exe wrapper exit code: $code"
+            if ($code -ne 0) {
+              Write-Host "Installer returned non-zero exit code: $code"
+              Write-Host "Files in $instDir :"
+              if (Test-Path $instDir) {
+                Get-ChildItem $instDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 30 FullName, Length | Format-Table -AutoSize
+              }
+              # If the install failed but wrote some files, continue anyway
+              # to see if the supervisor can launch (might reveal why)
+              if (-not (Test-Path "$instDir\AgenticOS.exe")) {
+                Write-Error "Installer did not write AgenticOS.exe"
+                exit 1
+              }
+            }
           }
           Start-Sleep -Seconds 3
 
@@ -373,5 +384,7 @@ jobs:
         with:
           name: windows-smoke-logs
           path: |
-            ${{ env.LOCALAPPDATA }}\AgenticOS\logs\*.log
+            ${{ runner.temp }}\..\..\..\..\..\..\Users\runneradmin\AppData\Local\AgenticOS\logs\*.log
+            C:\Users\runneradmin\AppData\Local\AgenticOS\logs\*.log
           retention-days: 7
+          if-no-files-found: warn

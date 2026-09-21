@@ -92,8 +92,6 @@ VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
 Function .onInit
     ; Require x64 Windows. In silent mode, just abort without UI.
     ${IfNot} ${RunningX64}
-        IfSilent 0 +3
-        Abort
         MessageBox MB_OK|MB_ICONSTOP \
           "AgenticOS requires a 64-bit edition of Windows.$\r$\n$\r$\nInstallation aborted."
         Abort
@@ -167,18 +165,14 @@ Section "MainSection" SEC01
 
     ; --- 9. Post-install validation ---
     ; Verify that every critical file was actually written. If any is
-    ; missing, abort silently in /S mode (no MessageBox — that would
-    ; hang CI runners). The exit code from a failed install is non-zero.
+    ; missing, abort (NSIS /S mode silently dismisses MessageBoxes).
     IfFileExists "$INSTDIR\AgenticOS.exe" +3 0
-        IfSilent +2
         MessageBox MB_OK|MB_ICONSTOP "Install failed: AgenticOS.exe was not written to $INSTDIR"
         Abort
     IfFileExists "$INSTDIR\agenticos-kernel.exe" +3 0
-        IfSilent +2
         MessageBox MB_OK|MB_ICONSTOP "Install failed: agenticos-kernel.exe was not written to $INSTDIR"
         Abort
     IfFileExists "$INSTDIR\dist\index.html" +3 0
-        IfSilent +2
         MessageBox MB_OK|MB_ICONSTOP "Install failed: dist\index.html was not written to $INSTDIR\dist"
         Abort
 SectionEnd
