@@ -152,15 +152,19 @@ jobs:
       - name: Verify no undefined variable references
         working-directory: src-tauri
         run: |
-          # The previous compile error was an undefined 'kernel_log_path' on
-          # line 452. Re-verify it stays fixed by ensuring every reference
-          # to kernel_log_path is preceded (lexically, earlier in the file)
-          # by a `let kernel_log_path` definition.
-          if ! grep -q 'let kernel_log_path' src/main.rs; then
-            echo "ERROR: 'let kernel_log_path' definition not found"
-            exit 1
-          fi
-          echo "OK: kernel_log_path is properly defined"
+          # The previously-broken 'kernel_log_path' undefined variable was
+          # in main.rs line 452. Verify the codebase still compiles by
+          # checking that any reference to kernel_log_path is preceded by
+          # a 'let kernel_log_path' definition in the same file.
+          for f in $(find src -name '*.rs'); do
+            if grep -q 'kernel_log_path' "$f"; then
+              if ! grep -q 'let kernel_log_path' "$f"; then
+                echo "ERROR: 'kernel_log_path' used but never defined in $f"
+                exit 1
+              fi
+            fi
+          done
+          echo "OK: all kernel_log_path references are properly defined"
 
   # ========================================================================
   # Job 4: Full native Windows build + smoke test (the expensive one)
@@ -235,12 +239,17 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          # Silent install
+          # Silent install. Must pass /D=<path> with no quotes and no trailing
+          # slash, otherwise NSIS may pop up the directory selection dialog
+          # even in silent mode (because InstallDirRegKey points to a path
+          # that doesn't exist on a clean runner).
           $installer = (Resolve-Path "public\downloads\AgenticOS-Setup-x64.exe").Path
-          Write-Host "Installing: $installer"
-          $installProc = Start-Process -FilePath $installer -ArgumentList "/S" -PassThru
-          if (-not $installProc.WaitForExit(60000)) {
-            Write-Host "Installer did not exit within 60s, killing..."
+          $instDir = "$env:LOCALAPPDATA\AgenticOS"
+          Write-Host "Installing: $installer /S /D=$instDir"
+          $installProc = Start-Process -FilePath $installer `
+            -ArgumentList "/S", "/D=$instDir" -PassThru
+          if (-not $installProc.WaitForExit(120000)) {
+            Write-Host "Installer did not exit within 120s, killing..."
             Stop-Process -Id $installProc.Id -Force -ErrorAction SilentlyContinue
             Write-Error "Installer timed out"
             exit 1

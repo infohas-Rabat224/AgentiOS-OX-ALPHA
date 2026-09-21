@@ -211,7 +211,14 @@ jobs:
         run: |
           $installer = (Resolve-Path "public\downloads\AgenticOS-Setup-x64.exe").Path
           if (-not (Test-Path $installer)) { Write-Error "Installer not found"; exit 1 }
-          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
+          $instDir = "$env:LOCALAPPDATA\AgenticOS"
+          $installProc = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$instDir" -PassThru
+          if (-not $installProc.WaitForExit(120000)) {
+            Stop-Process -Id $installProc.Id -Force -ErrorAction SilentlyContinue
+            Write-Error "Installer timed out"
+            exit 1
+          }
+          Write-Host "Installer exit code: $($installProc.ExitCode)"
           Start-Sleep -Seconds 2
 
       - name: Verify installation tree
