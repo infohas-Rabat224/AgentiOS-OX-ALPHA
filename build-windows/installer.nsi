@@ -53,8 +53,6 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN "$INSTDIR\AgenticOS.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Launch AgenticOS Desktop Mission Control"
 !insertmacro MUI_PAGE_FINISH
 
 ; Uninstaller Pages
