@@ -48,6 +48,10 @@ SetCompressor /SOLID lzma
 ; Interface Settings
 !define MUI_ABORTWARNING
 !define MUI_COMPONENTSPAGE_NODESC
+; In silent mode, suppress all UI entirely (don't even show details window)
+AutoCloseWindow true
+ShowInstDetails nevershow
+ShowUnInstDetails nevershow
 
 ; Pages
 !insertmacro MUI_PAGE_WELCOME
