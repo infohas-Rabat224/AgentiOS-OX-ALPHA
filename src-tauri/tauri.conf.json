@@ -46,14 +46,14 @@
     },
     "windows": {
       "nsis": {
-        "installerName": "AgenticOS-Setup-x64.exe",
-        "installerIcon": "icons/icon.ico",
-        "headerImage": null,
-        "sidebarImage": null,
-        "installMode": "currentUser",
-        "startMenuFolder": "AgenticOS",
+        "installer-name": "AgenticOS-Setup-x64.exe",
+        "installer-icon": "icons/icon.ico",
+        "header-image": null,
+        "sidebar-image": null,
+        "install-mode": "currentUser",
+        "start-menu-folder": "AgenticOS",
         "languages": ["English"],
-        "displayLanguageSelector": false,
+        "display-language-selector": false,
         "compression": "lzma",
         "template": "../build-windows/installer.nsi"
       },

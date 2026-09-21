@@ -18,9 +18,16 @@
 ;
 ; Output:
 ;   public\downloads\AgenticOS-Setup-x64.exe
+;
+; NOTE: We deliberately do NOT use "Target amd64-unicode" here because the
+;       stock NSIS package (chocolatey 'nsis' on Windows runners) does not
+;       ship the required stub (zlib-amd64-unicode). The installer is built
+;       with Unicode (default in NSIS 3.x) and runs as a 32-bit Unicode
+;       installer that uses WOW64 to access the native x64 filesystem.
+;       This is sufficient for an installer that targets
+;       $LOCALAPPDATA\AgenticOS — no machine-wide install is performed.
 ; ============================================================================
 
-Target amd64-unicode
 Unicode True
 
 !define PRODUCT_NAME "AgenticOS Desktop Mission Control"
