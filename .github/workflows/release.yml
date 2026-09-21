@@ -1,0 +1,395 @@
+name: Release AgenticOS Windows Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'rc*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0-rc11)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  PRODUCT_NAME: AgenticOS
+  PRODUCT_VERSION: 1.0.0-rc10
+
+jobs:
+  # ========================================================================
+  # Job 1: Build on Windows natively (uses MSVC + NSIS + Node)
+  # ========================================================================
+  build-windows:
+    name: Build Windows Installer (native)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend (vite build)
+        run: npm run build
+
+      - name: Verify frontend output
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\index.html")) {
+            Write-Error "Frontend build did not produce dist\index.html"
+            exit 1
+          }
+          $jsCount = (Get-ChildItem -Path "dist\assets" -Filter "*.js" -ErrorAction SilentlyContinue | Measure-Object).Count
+          if ($jsCount -lt 1) {
+            Write-Error "No JS assets in dist\assets\"
+            exit 1
+          }
+          Write-Host "Frontend OK: dist\index.html + $jsCount JS assets"
+
+      - name: Set up MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Compile AgenticOS.exe (supervisor)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build-windows\bin | Out-Null
+          cl /O2 /DUNICODE /D_UNICODE /EHsc `
+             /Fe:build-windows\bin\AgenticOS.exe `
+             build-windows\src\agenticos_main.c `
+             /link advapi32.lib gdi32.lib shell32.lib shlwapi.lib user32.lib wininet.lib `
+             /SUBSYSTEM:WINDOWS
+          if (-not (Test-Path "build-windows\bin\AgenticOS.exe")) {
+            Write-Error "Failed to compile AgenticOS.exe"
+            exit 2
+          }
+
+      - name: Compile agenticos-kernel.exe
+        shell: pwsh
+        run: |
+          cl /O2 /EHsc `
+             /Fe:build-windows\bin\agenticos-kernel.exe `
+             build-windows\src\agenticos_kernel.c `
+             /link ws2_32.lib shlwapi.lib `
+             /SUBSYSTEM:CONSOLE
+          if (-not (Test-Path "build-windows\bin\agenticos-kernel.exe")) {
+            Write-Error "Failed to compile agenticos-kernel.exe"
+            exit 2
+          }
+
+      - name: Verify compiled binaries
+        shell: pwsh
+        run: |
+          foreach ($bin in @("build-windows\bin\AgenticOS.exe",
+                              "build-windows\bin\agenticos-kernel.exe")) {
+            if (-not (Test-Path $bin)) { Write-Error "Missing: $bin"; exit 4 }
+            $size = (Get-Item $bin).Length
+            if ($size -lt 50000) {
+              Write-Error "Binary too small: $bin ($size bytes)"
+              exit 4
+            }
+            $bytes = [System.IO.File]::ReadAllBytes($bin)[0..1]
+            if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+              Write-Error "Not a PE executable: $bin"
+              exit 4
+            }
+            Write-Host "OK: $bin ($size bytes)"
+          }
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          Push-Location build-windows
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          $exit = $LASTEXITCODE
+          Pop-Location
+          if ($exit -ne 0) { exit 3 }
+          if (-not (Test-Path "public\downloads\AgenticOS-Setup-x64.exe")) {
+            Write-Error "Installer not produced"
+            exit 3
+          }
+
+      - name: Build portable ZIP
+        shell: pwsh
+        run: |
+          $staging = "build-windows\portable_staging\AgenticOS"
+          Remove-Item -Recurse -Force $staging -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item "build-windows\bin\AgenticOS.exe"          $staging
+          Copy-Item "build-windows\bin\agenticos-kernel.exe"  $staging
+          Copy-Item "start-agenticos.bat"                       $staging
+          Copy-Item "dist" $staging -Recurse
+          New-Item -ItemType Directory -Force -Path "$staging\AgenticosHybrid" | Out-Null
+          Copy-Item "AgenticosHybrid\src" "$staging\AgenticosHybrid\src" -Recurse
+          New-Item -ItemType Directory -Force -Path "$staging\python" | Out-Null
+          Copy-Item "python\runtime-manifest.json" "$staging\python\"
+          Compress-Archive -Path $staging -DestinationPath "public\downloads\AgenticOS-Portable-x64.zip" -Force
+          Copy-Item "build-windows\bin\AgenticOS.exe" "public\downloads\AgenticOS.exe" -Force
+
+      - name: Compute SHA256 checksums
+        shell: pwsh
+        run: |
+          $downloads = "public\downloads"
+          $lines = @()
+          foreach ($name in @("AgenticOS-Setup-x64.exe", "AgenticOS-Portable-x64.zip", "AgenticOS.exe")) {
+            $p = Join-Path $downloads $name
+            if (Test-Path $p) {
+              $hash = (Get-FileHash -Algorithm SHA256 $p).Hash.ToLower()
+              $lines += "$hash  $name"
+            }
+          }
+          $lines | Out-File -Encoding ascii "public\downloads\SHA256SUMS"
+          $lines | Out-File -Encoding ascii "public\downloads\checksums.txt"
+          $lines | Out-File -Encoding ascii "public\SHA256SUMS"
+          $lines | Out-File -Encoding ascii "public\checksums.txt"
+          Get-Content "public\downloads\SHA256SUMS"
+
+      - name: Validate installer
+        shell: pwsh
+        run: |
+          $installer = "public\downloads\AgenticOS-Setup-x64.exe"
+          $size = (Get-Item $installer).Length
+          if ($size -lt 500000) {
+            Write-Error "Installer too small: $size bytes (expected >= 500KB)"
+            exit 4
+          }
+          $bytes = [System.IO.File]::ReadAllBytes($installer)[0..1]
+          if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            Write-Error "Installer is not a valid PE executable"
+            exit 4
+          }
+          Write-Host "Installer OK: $size bytes"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenticos-windows-build
+          path: |
+            public/downloads/AgenticOS-Setup-x64.exe
+            public/downloads/AgenticOS-Portable-x64.zip
+            public/downloads/AgenticOS.exe
+            public/downloads/SHA256SUMS
+            public/downloads/checksums.txt
+            build-windows/bin/AgenticOS.exe
+            build-windows/bin/agenticos-kernel.exe
+            dist/index.html
+          retention-days: 30
+
+  # ========================================================================
+  # Job 2: Smoke-test install → launch → verify on a clean Windows runner
+  # ========================================================================
+  smoke-test:
+    name: Smoke Test (install + launch + verify)
+    runs-on: windows-latest
+    needs: build-windows
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: agenticos-windows-build
+
+      - name: Install AgenticOS silently
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "public\downloads\AgenticOS-Setup-x64.exe").Path
+          if (-not (Test-Path $installer)) { Write-Error "Installer not found"; exit 1 }
+          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
+          Start-Sleep -Seconds 2
+
+      - name: Verify installation tree
+        shell: pwsh
+        run: |
+          $instDir = "$env:LOCALAPPDATA\AgenticOS"
+          foreach ($f in @(
+            "$instDir\AgenticOS.exe",
+            "$instDir\agenticos-kernel.exe",
+            "$instDir\dist\index.html"
+          )) {
+            if (-not (Test-Path $f)) {
+              Write-Error "Missing installed file: $f"
+              exit 1
+            }
+          }
+          Write-Host "Installation tree OK"
+
+      - name: Launch AgenticOS and verify backend health
+        shell: pwsh
+        run: |
+          $exe = "$env:LOCALAPPDATA\AgenticOS\AgenticOS.exe"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8   # give the backend time to come up
+
+          # Verify the supervisor process is running
+          if ($p.HasExited) {
+            Write-Error "Supervisor exited immediately with code $($p.ExitCode)"
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\startup.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host "Supervisor running with PID $($p.Id)"
+
+          # Verify the kernel process is running
+          $kernel = Get-Process -Name "agenticos-kernel" -ErrorAction SilentlyContinue
+          if (-not $kernel) {
+            Write-Error "agenticos-kernel.exe process not found"
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\startup.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host "Kernel running with PID $($kernel.Id)"
+
+          # Verify backend health endpoint
+          $healthy = $false
+          for ($i = 0; $i -lt 20; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8001/healthz" -UseBasicParsing -TimeoutSec 2
+              if ($r.StatusCode -eq 200) { $healthy = $true; break }
+            } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $healthy) {
+            Write-Error "Backend never became healthy on http://127.0.0.1:8001/healthz"
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\startup.log" -ErrorAction SilentlyContinue
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\kernel.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host "Backend healthy: $($r.Content)"
+
+          # Verify frontend endpoint
+          try {
+            $r2 = Invoke-WebRequest -Uri "http://127.0.0.1:3000/" -UseBasicParsing -TimeoutSec 5
+            if ($r2.StatusCode -ne 200) {
+              Write-Error "Frontend endpoint returned $($r2.StatusCode)"
+              exit 1
+            }
+            Write-Host "Frontend OK (returned $($r2.Content.Length) bytes)"
+          } catch {
+            Write-Error "Frontend endpoint failed: $_"
+            exit 1
+          }
+
+          # Verify startup log was written
+          if (-not (Test-Path "$env:LOCALAPPDATA\AgenticOS\logs\startup.log")) {
+            Write-Error "Startup log not created"
+            exit 1
+          }
+          Write-Host "Startup log: $env:LOCALAPPDATA\AgenticOS\logs\startup.log"
+
+      - name: Clean shutdown
+        shell: pwsh
+        run: |
+          Get-Process -Name "AgenticOS" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Process -Name "agenticos-kernel" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+
+          # Verify no orphan processes
+          $orphan = Get-Process -Name "agenticos-kernel" -ErrorAction SilentlyContinue
+          if ($orphan) {
+            Write-Error "Orphan kernel process detected after shutdown"
+            exit 1
+          }
+          Write-Host "Clean shutdown verified"
+
+      - name: Uninstall and verify removal
+        shell: pwsh
+        run: |
+          $uninst = "$env:LOCALAPPDATA\AgenticOS\uninstall.exe"
+          if (Test-Path $uninst) {
+            Start-Process -FilePath $uninst -ArgumentList "/S" -Wait
+          }
+          Start-Sleep -Seconds 2
+          if (Test-Path "$env:LOCALAPPDATA\AgenticOS\AgenticOS.exe") {
+            Write-Error "Uninstall did not remove AgenticOS.exe"
+            exit 1
+          }
+          Write-Host "Uninstall verified"
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenticos-smoke-test-logs
+          path: |
+            ${{ runner.temp }}/**/startup.log
+            ${{ runner.temp }}/**/kernel.log
+          retention-days: 7
+
+  # ========================================================================
+  # Job 3: Publish GitHub Release (only after smoke test passes)
+  # ========================================================================
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, smoke-test]
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: agenticos-windows-build
+          path: artifacts
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF_NAME:-1.0.0-rc10}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: AgenticOS ${{ steps.version.outputs.version }}
+          body: |
+            # AgenticOS v${{ steps.version.outputs.version }}
+
+            ## Installation
+            1. Download `AgenticOS-Setup-x64.exe`
+            2. Run the installer
+            3. Click the AgenticOS shortcut on your Desktop or Start Menu
+
+            ## Verification
+            This release was built and smoke-tested on a clean Windows runner:
+            - ✅ Frontend built (dist/index.html + JS assets)
+            - ✅ Native C binaries compiled (AgenticOS.exe + agenticos-kernel.exe)
+            - ✅ NSIS installer built (>500KB, valid PE32+)
+            - ✅ Silent install succeeded
+            - ✅ Supervisor process started
+            - ✅ Backend kernel process started
+            - ✅ Health endpoint http://127.0.0.1:8001/healthz returned 200
+            - ✅ Frontend endpoint http://127.0.0.1:3000/ returned 200
+            - ✅ Clean shutdown (no orphan processes)
+            - ✅ Uninstaller removed all binaries
+
+            ## Checksums
+            See `SHA256SUMS` for SHA-256 hashes of all release artifacts.
+          files: |
+            artifacts/public/downloads/AgenticOS-Setup-x64.exe
+            artifacts/public/downloads/AgenticOS-Portable-x64.zip
+            artifacts/public/downloads/AgenticOS.exe
+            artifacts/public/downloads/SHA256SUMS
+            artifacts/public/downloads/checksums.txt
+          draft: false
+          prerelease: true

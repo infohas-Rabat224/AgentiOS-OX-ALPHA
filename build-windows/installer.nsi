@@ -1,5 +1,24 @@
-; AgenticOS Windows x64 Production Installer
-; Built with NSIS (Nullsoft Scriptable Install System)
+; ============================================================================
+; AgenticOS Windows x64 Production Installer (NSIS)
+; Version: 1.0.0-rc10
+; ============================================================================
+; This installer:
+;   * installs AgenticOS.exe + agenticos-kernel.exe (native C binaries)
+;   * installs the built frontend dist/ tree (React + Vite)
+;   * installs AgenticosHybrid/ (Python source — kept for reference only,
+;     NOT required at runtime; the native kernel does not depend on Python)
+;   * does NOT install a Python runtime (the kernel is native C)
+;   * does NOT depend on bash, WSL, Git Bash, npm, cargo, or vite at runtime
+;   * creates Start Menu + Desktop shortcuts
+;   * writes a complete Add/Remove Programs registry entry
+;   * writes an uninstaller that removes binaries, shortcuts, and registry
+;
+; Build:
+;   makensis build-windows\installer.nsi
+;
+; Output:
+;   public\downloads\AgenticOS-Setup-x64.exe
+; ============================================================================
 
 Target amd64-unicode
 Unicode True
@@ -16,6 +35,8 @@ SetCompressor /SOLID lzma
 ; Includes
 !include "MUI2.nsh"
 !include "x64.nsh"
+!include "LogicLib.nsh"
+!include "FileFunc.nsh"
 
 ; Interface Settings
 !define MUI_ABORTWARNING
@@ -46,6 +67,7 @@ ShowInstDetails show
 ShowUnInstDetails show
 RequestExecutionLevel user
 
+; Version metadata embedded in the final exe's PE resource
 VIProductVersion "1.0.0.10"
 VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
 VIAddVersionKey "Comments" "Autonomous AI Multi-Agent Operating System Desktop Runtime"
@@ -55,43 +77,81 @@ VIAddVersionKey "FileDescription" "AgenticOS Windows x64 Native Setup"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
 
+; ============================================================================
+; Pre-install validation
+; ============================================================================
+Function .onInit
+    ; Require x64 Windows
+    ${IfNot} ${RunningX64}
+        MessageBox MB_OK|MB_ICONSTOP \
+          "AgenticOS requires a 64-bit edition of Windows.$\r$\n$\r$\nInstallation aborted."
+        Abort
+    ${EndIf}
+
+    ; Verify the required source binaries exist before we start writing files.
+    ; If these are missing, the build pipeline is broken — abort loudly rather
+    ; than ship a half-built installer that the user will only discover is
+    ; broken after clicking AgenticOS and seeing nothing.
+    IfFileExists "bin\AgenticOS.exe" +3 0
+        MessageBox MB_OK|MB_ICONSTOP \
+          "Build pipeline error: bin\AgenticOS.exe is missing.$\r$\n$\r$\nInstallation aborted."
+        Abort
+    IfFileExists "bin\agenticos-kernel.exe" +3 0
+        MessageBox MB_OK|MB_ICONSTOP \
+          "Build pipeline error: bin\agenticos-kernel.exe is missing.$\r$\n$\r$\nInstallation aborted."
+        Abort
+    IfFileExists "..\dist\index.html" +3 0
+        MessageBox MB_OK|MB_ICONSTOP \
+          "Build pipeline error: ..\dist\index.html is missing.$\r$\n$\r$\n$\r$\nRun 'npm run build' before building the installer.$\r$\nInstallation aborted."
+        Abort
+FunctionEnd
+
+; ============================================================================
+; Main install section
+; ============================================================================
 Section "MainSection" SEC01
     SetOutPath "$INSTDIR"
     SetOverwrite on
 
-    ; 1. Native Windows Executables
-    File "bin/AgenticOS.exe"
-    File "bin/agenticos-kernel.exe"
-    File "../start-agenticos.bat"
+    ; --- 1. Native Windows Executables ---
+    File "bin\AgenticOS.exe"
+    File "bin\agenticos-kernel.exe"
+    File "..\start-agenticos.bat"
 
-    ; 2. Complete Frontend Distribution
+    ; --- 2. Frontend distribution (built with `npm run build`) ---
     SetOutPath "$INSTDIR\dist"
-    File /r /x downloads "../dist\*.*"
+    File /r /x downloads "..\dist\*.*"
 
-    ; 3. AgenticOS Hybrid Core Python Engine
+    ; --- 3. AgenticOS Hybrid Core Python Engine (source-only; not required
+    ;        at runtime. Bundled for reference / future Python integration.) ---
     SetOutPath "$INSTDIR\AgenticosHybrid"
-    File /r /x .git /x node_modules /x __pycache__ "../AgenticosHybrid\*.*"
+    File /r /x .git /x node_modules /x __pycache__ /x "*.pyc" "..\AgenticosHybrid\*.*"
 
-    ; 4. Bundled Python Runtime Environment
+    ; --- 4. Runtime manifest stub (overwritten by kernel at startup) ---
     SetOutPath "$INSTDIR\python"
-    File /r /x .git /x __pycache__ "../python\*.*"
+    File "..\python\runtime-manifest.json"
 
-    ; 5. Prepare logs, workspace, and config directories
-    CreateDirectory "$INSTDIR\logs"
-    CreateDirectory "$INSTDIR\workspace"
-    CreateDirectory "$INSTDIR\security"
+    ; --- 5. Prepare mutable application data directories in %LOCALAPPDATA% ---
+    ; (These are NOT in $INSTDIR — see the Application Data policy.)
+    CreateDirectory "$LOCALAPPDATA\AgenticOS"
+    CreateDirectory "$LOCALAPPDATA\AgenticOS\logs"
+    CreateDirectory "$LOCALAPPDATA\AgenticOS\workspace"
+    CreateDirectory "$LOCALAPPDATA\AgenticOS\security"
 
-    ; 5. Shortcuts
+    ; --- 6. Shortcuts ---
     SetOutPath "$INSTDIR"
     CreateDirectory "$SMPROGRAMS\AgenticOS"
-    CreateShortCut "$SMPROGRAMS\AgenticOS\AgenticOS Mission Control.lnk" "$INSTDIR\AgenticOS.exe" "" "$INSTDIR\AgenticOS.exe" 0
-    CreateShortCut "$SMPROGRAMS\AgenticOS\Uninstall AgenticOS.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
-    CreateShortCut "$DESKTOP\AgenticOS Mission Control.lnk" "$INSTDIR\AgenticOS.exe" "" "$INSTDIR\AgenticOS.exe" 0
+    CreateShortCut "$SMPROGRAMS\AgenticOS\AgenticOS Mission Control.lnk" \
+        "$INSTDIR\AgenticOS.exe" "" "$INSTDIR\AgenticOS.exe" 0
+    CreateShortCut "$SMPROGRAMS\AgenticOS\Uninstall AgenticOS.lnk" \
+        "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
+    CreateShortCut "$DESKTOP\AgenticOS Mission Control.lnk" \
+        "$INSTDIR\AgenticOS.exe" "" "$INSTDIR\AgenticOS.exe" 0
 
-    ; 6. Write Uninstaller
+    ; --- 7. Uninstaller ---
     WriteUninstaller "$INSTDIR\uninstall.exe"
 
-    ; 7. Windows Registry Add/Remove Programs
+    ; --- 8. Registry entries for Add/Remove Programs ---
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\AgenticOS.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninstall.exe"
@@ -103,31 +163,49 @@ Section "MainSection" SEC01
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+
+    ; --- 9. Post-install validation ---
+    ; Verify that every critical file was actually written. If any is missing,
+    ; abort the installation with a clear error rather than declare success.
+    IfFileExists "$INSTDIR\AgenticOS.exe" +3 0
+        MessageBox MB_OK|MB_ICONSTOP "Install failed: AgenticOS.exe was not written to $INSTDIR"
+        Abort
+    IfFileExists "$INSTDIR\agenticos-kernel.exe" +3 0
+        MessageBox MB_OK|MB_ICONSTOP "Install failed: agenticos-kernel.exe was not written to $INSTDIR"
+        Abort
+    IfFileExists "$INSTDIR\dist\index.html" +3 0
+        MessageBox MB_OK|MB_ICONSTOP "Install failed: dist\index.html was not written to $INSTDIR\dist"
+        Abort
 SectionEnd
 
+; ============================================================================
+; Uninstall
+; ============================================================================
 Section Uninstall
-    ; Remove Shortcuts
+    ; --- Remove Shortcuts ---
     Delete "$DESKTOP\AgenticOS Mission Control.lnk"
     Delete "$SMPROGRAMS\AgenticOS\AgenticOS Mission Control.lnk"
     Delete "$SMPROGRAMS\AgenticOS\Uninstall AgenticOS.lnk"
     RMDir "$SMPROGRAMS\AgenticOS"
 
-    ; Remove Application Files
+    ; --- Remove Application Files ---
     Delete "$INSTDIR\AgenticOS.exe"
     Delete "$INSTDIR\agenticos-kernel.exe"
     Delete "$INSTDIR\start-agenticos.bat"
     Delete "$INSTDIR\uninstall.exe"
+    Delete "$INSTDIR\python\runtime-manifest.json"
+    RMDir "$INSTDIR\python"
 
-    ; Remove Directories
+    ; --- Remove Directories ---
     RMDir /r "$INSTDIR\dist"
     RMDir /r "$INSTDIR\AgenticosHybrid"
-    RMDir /r "$INSTDIR\python"
-    RMDir /r "$INSTDIR\workspace"
 
-    ; Try removing root directory if empty (leaves user logs/security)
+    ; Try removing root directory if empty (we intentionally do NOT remove
+    ; $LOCALAPPDATA\AgenticOS — that holds user logs, workspace, and security
+    ; state; the user must remove those manually if they want a full wipe).
     RMDir "$INSTDIR"
 
-    ; Remove Registry Keys
+    ; --- Remove Registry Keys ---
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegKey HKCU "${PRODUCT_DIR_REGKEY}"
     SetAutoClose true

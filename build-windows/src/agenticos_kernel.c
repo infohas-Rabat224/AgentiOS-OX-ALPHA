@@ -430,6 +430,28 @@ static void write_runtime_manifest() {
     }
 }
 
+// Write a "starting" manifest so supervisor can detect kernel is alive
+// even before any port has been bound.
+static void write_starting_manifest() {
+    char manifest_path[MAX_PATH];
+    snprintf(manifest_path, sizeof(manifest_path), "%s\\runtime.json", g_log_dir);
+    FILE *f = fopen(manifest_path, "w");
+    if (f) {
+        time_t now = time(NULL);
+        char time_buf[64];
+        strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+        fprintf(f, "{\n");
+        fprintf(f, "  \"version\": \"1.0.0-rc10\",\n");
+        fprintf(f, "  \"status\": \"starting\",\n");
+        fprintf(f, "  \"kernelPort\": %d,\n", g_kernel_port);
+        fprintf(f, "  \"frontendPort\": %d,\n", g_frontend_port);
+        fprintf(f, "  \"pid\": %lu,\n", GetCurrentProcessId());
+        fprintf(f, "  \"timestamp\": \"%s\"\n", time_buf);
+        fprintf(f, "}\n");
+        fclose(f);
+    }
+}
+
 int main(int argc, char *argv[]) {
     InitializeCriticalSection(&g_cs);
     g_start_time = time(NULL);
@@ -456,6 +478,10 @@ int main(int argc, char *argv[]) {
     log_msg("KERNEL", "Frontend Dir:  %s", g_dist_dir);
     log_msg("KERNEL", "Architecture:  x86_64 PE32+ (Windows Native Engine)");
     log_msg("KERNEL", "============================================================");
+
+    // Write an early "starting" manifest so the supervisor can detect that
+    // the kernel process is alive even before any port has been bound.
+    write_starting_manifest();
 
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {

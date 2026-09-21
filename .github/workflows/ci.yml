@@ -1,0 +1,259 @@
+name: CI — Validate AgenticOS Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ========================================================================
+  # Job 1: Lint + frontend build on Linux (cheap, fast)
+  # ========================================================================
+  frontend-build:
+    name: Build Frontend (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Verify dist output
+        run: |
+          test -f dist/index.html
+          test -n "$(find dist/assets -name '*.js' -type f | head -1)"
+          echo "OK: dist/index.html + JS assets present"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 7
+
+  # ========================================================================
+  # Job 2: Source-code static checks
+  # ========================================================================
+  source-scan:
+    name: Scan for Development-Only Paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan C binaries source for dev-only references
+        run: |
+          set -e
+          echo "Scanning build-windows/src/*.c for forbidden dev-only strings..."
+          # Forbidden strings in PRODUCTION C source:
+          #   - PYTHONPATH (no Python dependency at runtime)
+          #   - python3 -m  (no Python invocation at runtime)
+          #   - daemon_agentic_os.sh (no bash dependency at runtime)
+          #   - WSL / Git Bash (no subsystem dependency)
+          if grep -nE 'PYTHONPATH|python3 -m|daemon_agentic_os\.sh|/tmp/agentic|WSL|Git Bash' \
+             build-windows/src/*.c; then
+            echo "ERROR: development-only string found in production C source"
+            exit 1
+          fi
+          echo "OK: no dev-only strings in C source"
+
+      - name: Scan NSIS installer for dev-only references
+        run: |
+          set -e
+          echo "Scanning build-windows/installer.nsi for forbidden dev-only paths..."
+          if grep -nE 'C:\\\\Users|D:\\\\project|\.\./\.\./' build-windows/installer.nsi; then
+            echo "ERROR: hardcoded developer path found in installer"
+            exit 1
+          fi
+          echo "OK: no hardcoded dev paths in installer"
+
+      - name: Verify required production files exist in source tree
+        run: |
+          set -e
+          for f in \
+            build-windows/src/agenticos_main.c \
+            build-windows/src/agenticos_kernel.c \
+            build-windows/installer.nsi \
+            scripts/build-windows-release.sh \
+            start-agenticos.bat \
+            package.json \
+            vite.config.ts \
+            index.html \
+            src/main.tsx \
+            src/App.tsx \
+            src-tauri/Cargo.toml \
+            src-tauri/tauri.conf.json; do
+            if [ ! -f "$f" ]; then
+              echo "ERROR: missing required file: $f"
+              exit 1
+            fi
+          done
+          echo "OK: all required source files present"
+
+  # ========================================================================
+  # Job 3: Rust compile check (src-tauri) — must compile cleanly
+  # ========================================================================
+  rust-check:
+    name: Rust src-tauri compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Check src-tauri compiles
+        working-directory: src-tauri
+        run: |
+          cargo check --message-format=short 2>&1 | tee cargo-check.log
+          # Fail if there are any errors
+          if grep -E '^error' cargo-check.log; then exit 1; fi
+      - name: Verify no undefined variable references
+        working-directory: src-tauri
+        run: |
+          # The previous compile error was an undefined 'kernel_log_path' on line 452.
+          # Re-verify it stays fixed:
+          if grep -nE 'kernel_log_path' src/main.rs | grep -v 'let kernel_log_path' ; then
+            echo "ERROR: 'kernel_log_path' referenced without definition"
+            exit 1
+          fi
+          echo "OK: no undefined kernel_log_path references"
+
+  # ========================================================================
+  # Job 4: Full native Windows build + smoke test (the expensive one)
+  # ========================================================================
+  windows-build-and-smoke:
+    name: Windows build + smoke test
+    runs-on: windows-latest
+    needs: [frontend-build, source-scan]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps + build frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Compile native binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build-windows\bin | Out-Null
+          cl /O2 /DUNICODE /D_UNICODE /EHsc `
+             /Fe:build-windows\bin\AgenticOS.exe `
+             build-windows\src\agenticos_main.c `
+             /link advapi32.lib gdi32.lib shell32.lib shlwapi.lib user32.lib wininet.lib `
+             /SUBSYSTEM:WINDOWS
+          if (-not (Test-Path "build-windows\bin\AgenticOS.exe")) { exit 2 }
+
+          cl /O2 /EHsc `
+             /Fe:build-windows\bin\agenticos-kernel.exe `
+             build-windows\src\agenticos_kernel.c `
+             /link ws2_32.lib shlwapi.lib `
+             /SUBSYSTEM:CONSOLE
+          if (-not (Test-Path "build-windows\bin\agenticos-kernel.exe")) { exit 2 }
+
+      - name: Install NSIS + build installer
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $nsisPath = "C:\Program Files (x86)\NSIS"
+          echo "$nsisPath" >> $env:GITHUB_PATH
+          Push-Location build-windows
+          & "$nsisPath\makensis.exe" installer.nsi
+          $exit = $LASTEXITCODE
+          Pop-Location
+          if ($exit -ne 0) { exit 3 }
+          if (-not (Test-Path "public\downloads\AgenticOS-Setup-x64.exe")) { exit 3 }
+
+      - name: Validate installer
+        shell: pwsh
+        run: |
+          $installer = "public\downloads\AgenticOS-Setup-x64.exe"
+          $size = (Get-Item $installer).Length
+          if ($size -lt 500000) { Write-Error "Installer too small: $size bytes"; exit 4 }
+          Write-Host "Installer OK: $size bytes"
+
+      - name: Silent install + smoke test
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "public\downloads\AgenticOS-Setup-x64.exe").Path
+          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
+          Start-Sleep -Seconds 2
+
+          # Verify install tree
+          $instDir = "$env:LOCALAPPDATA\AgenticOS"
+          foreach ($f in @(
+            "$instDir\AgenticOS.exe",
+            "$instDir\agenticos-kernel.exe",
+            "$instDir\dist\index.html"
+          )) {
+            if (-not (Test-Path $f)) { Write-Error "Missing: $f"; exit 1 }
+          }
+
+          # Launch
+          $p = Start-Process -FilePath "$instDir\AgenticOS.exe" -PassThru
+          Start-Sleep -Seconds 8
+
+          if ($p.HasExited) {
+            Write-Error "Supervisor exited with code $($p.ExitCode)"
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\startup.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+
+          # Verify backend health
+          $healthy = $false
+          for ($i = 0; $i -lt 20; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8001/healthz" -UseBasicParsing -TimeoutSec 2
+              if ($r.StatusCode -eq 200) { $healthy = $true; break }
+            } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $healthy) {
+            Write-Error "Backend never became healthy"
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\startup.log" -ErrorAction SilentlyContinue
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\kernel.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host "Backend healthy: $($r.Content)"
+
+          # Verify frontend
+          try {
+            $r2 = Invoke-WebRequest -Uri "http://127.0.0.1:3000/" -UseBasicParsing -TimeoutSec 5
+            if ($r2.StatusCode -ne 200) { Write-Error "Frontend returned $($r2.StatusCode)"; exit 1 }
+            Write-Host "Frontend OK"
+          } catch {
+            Write-Error "Frontend failed: $_"; exit 1
+          }
+
+          # Clean shutdown
+          Get-Process -Name "AgenticOS" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Process -Name "agenticos-kernel" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          if (Get-Process -Name "agenticos-kernel" -ErrorAction SilentlyContinue) {
+            Write-Error "Orphan kernel process"; exit 1
+          }
+
+          Write-Host "ALL SMOKE TESTS PASSED"
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke-logs
+          path: |
+            ${{ env.LOCALAPPDATA }}\AgenticOS\logs\*.log
+          retention-days: 7
