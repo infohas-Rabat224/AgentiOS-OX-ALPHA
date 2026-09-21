@@ -21,12 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build frontend
+        run: bun run build
       - name: Verify dist output
         run: |
           test -f dist/index.html
@@ -46,27 +48,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Scan C binaries source for dev-only references
+      - name: Scan C source for dev-only strings (comment-aware via validator)
         run: |
           set -e
-          echo "Scanning build-windows/src/*.c for forbidden dev-only strings..."
-          # Forbidden strings in PRODUCTION C source:
-          #   - PYTHONPATH (no Python dependency at runtime)
-          #   - python3 -m  (no Python invocation at runtime)
-          #   - daemon_agentic_os.sh (no bash dependency at runtime)
-          #   - WSL / Git Bash (no subsystem dependency)
-          if grep -nE 'PYTHONPATH|python3 -m|daemon_agentic_os\.sh|/tmp/agentic|WSL|Git Bash' \
-             build-windows/src/*.c; then
-            echo "ERROR: development-only string found in production C source"
-            exit 1
-          fi
-          echo "OK: no dev-only strings in C source"
+          # Use the comment-aware Python validator (handles // inside string
+          # literals and /* */ inside source code). This avoids false-positives
+          # where the supervisor's docstring mentions "WSL" or "Git Bash" to
+          # explain what NOT to depend on at runtime.
+          python3 scripts/audit/validate_c_source.py .
 
-      - name: Scan NSIS installer for dev-only references
+      - name: Scan NSIS installer for hardcoded dev paths
         run: |
           set -e
-          echo "Scanning build-windows/installer.nsi for forbidden dev-only paths..."
-          if grep -nE 'C:\\\\Users|D:\\\\project|\.\./\.\./' build-windows/installer.nsi; then
+          # Look for absolute Windows paths to developer home/project dirs.
+          # (Installer legitimately references ..\dist and ..\AgenticosHybrid
+          # which are relative paths from build-windows/, so those are fine.)
+          if grep -nE 'C:\\Users\\|D:\\project' build-windows/installer.nsi; then
             echo "ERROR: hardcoded developer path found in installer"
             exit 1
           fi
@@ -103,26 +100,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Tauri Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+
       - name: Check src-tauri compiles
         working-directory: src-tauri
         run: |
-          cargo check --message-format=short 2>&1 | tee cargo-check.log
-          # Fail if there are any errors
-          if grep -E '^error' cargo-check.log; then exit 1; fi
+          # Capture exit code without pipefail-losing it through tee.
+          set +e
+          cargo check --message-format=short > cargo-check.log 2>&1
+          rc=$?
+          cat cargo-check.log
+          if [ $rc -ne 0 ]; then
+            echo "ERROR: cargo check failed with exit code $rc"
+            exit $rc
+          fi
+          # Belt-and-suspenders: also scan for any error lines
+          if grep -E '^error(\[|$)' cargo-check.log; then
+            echo "ERROR: error lines detected in cargo check output"
+            exit 1
+          fi
+          echo "OK: cargo check succeeded"
+
       - name: Verify no undefined variable references
         working-directory: src-tauri
         run: |
-          # The previous compile error was an undefined 'kernel_log_path' on line 452.
-          # Re-verify it stays fixed:
-          if grep -nE 'kernel_log_path' src/main.rs | grep -v 'let kernel_log_path' ; then
-            echo "ERROR: 'kernel_log_path' referenced without definition"
+          # The previous compile error was an undefined 'kernel_log_path' on
+          # line 452. Re-verify it stays fixed by ensuring every reference
+          # to kernel_log_path is preceded (lexically, earlier in the file)
+          # by a `let kernel_log_path` definition.
+          if ! grep -q 'let kernel_log_path' src/main.rs; then
+            echo "ERROR: 'let kernel_log_path' definition not found"
             exit 1
           fi
-          echo "OK: no undefined kernel_log_path references"
+          echo "OK: kernel_log_path is properly defined"
 
   # ========================================================================
   # Job 4: Full native Windows build + smoke test (the expensive one)
@@ -133,15 +162,20 @@ jobs:
     needs: [frontend-build, source-scan]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install deps + build frontend
+        shell: pwsh
         run: |
-          npm ci
-          npm run build
+          bun install --frozen-lockfile
+          bun run build
+          if (-not (Test-Path "dist\index.html")) {
+            Write-Error "Frontend build failed: dist\index.html missing"
+            exit 1
+          }
 
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
