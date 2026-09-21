@@ -113,7 +113,11 @@ static void  pump_messages_briefly(DWORD ms);
  *   Logging
  * ========================================================================= */
 static void write_log(const WCHAR *format, ...) {
-    FILE *f = _wfopen(g_startup_log, L"a, ccs=UTF-8");
+    /* Open in plain append mode without ccs= — the ccs=UTF-8 flag has
+     * known issues with fwprintf %s format specifier that can cause
+     * STATUS_STACK_BUFFER_OVERRUN crashes. We write wide chars directly;
+     * the file will be UTF-16LE on disk (which Notepad reads correctly). */
+    FILE *f = _wfopen(g_startup_log, L"a, ccs=UTF-16LE");
     if (!f) return;
 
     time_t now = time(NULL);
@@ -239,11 +243,14 @@ static void build_diagnostic_text(const WCHAR *phase) {
  *   Runtime manifest (kernel_port, frontend_port)
  * ========================================================================= */
 static void read_runtime_manifest(void) {
-    FILE *f = _wfopen(g_runtime_manifest, L"r, ccs=UTF-8");
+    /* Open in binary mode without ccs= — the kernel writes runtime.json
+     * as plain ANSI/UTF-8 without BOM, and _wfopen with ccs=UTF-8 may
+     * misinterpret the lack of BOM. */
+    FILE *f = _wfopen(g_runtime_manifest, L"rb");
     if (!f) return;
 
     char line[512];
-    while (fgets(line, sizeof(line), (FILE *)f)) {
+    while (fgets(line, sizeof(line), f)) {
         int port = 0;
         if (sscanf(line, " \"kernelPort\": %d", &port) == 1 && port > 0) {
             g_kernel_port = port;
@@ -1184,7 +1191,7 @@ static WCHAR g_crash_log_path[MAX_PATH] = {0};
 
 static LONG CALLBACK crash_handler(PEXCEPTION_POINTERS ep) {
     if (g_crash_log_path[0] == L'\0') return EXCEPTION_CONTINUE_SEARCH;
-    FILE *f = _wfopen(g_crash_log_path, L"a, ccs=UTF-8");
+    FILE *f = _wfopen(g_crash_log_path, L"a, ccs=UTF-16LE");
     if (!f) return EXCEPTION_CONTINUE_SEARCH;
 
     time_t now = time(NULL);
@@ -1229,7 +1236,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             g_crash_log_path[MAX_PATH - 1] = L'\0';
             AddVectoredExceptionHandler(1 /* first */, crash_handler);
 
-            FILE *f = _wfopen(g_crash_log_path, L"a, ccs=UTF-8");
+            FILE *f = _wfopen(g_crash_log_path, L"a, ccs=UTF-16LE");
             if (f) {
                 time_t now = time(NULL);
                 struct tm *tm_info = localtime(&now);
