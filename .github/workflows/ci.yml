@@ -121,6 +121,15 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Create empty dist/ so generate_context! can validate frontendDist
+        run: |
+          # The Tauri proc macro generate_context!() validates at compile
+          # time that tauri.conf.json's frontendDist path exists. We don't
+          # need the actual frontend for cargo check — just the path.
+          mkdir -p ../dist
+          echo '<!doctype html><html><body></body></html>' > ../dist/index.html
+        working-directory: src-tauri
+
       - name: Check src-tauri compiles
         working-directory: src-tauri
         run: |
