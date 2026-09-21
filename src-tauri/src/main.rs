@@ -401,18 +401,19 @@ impl KernelLifecycleService {
         let log_dir = Logger::resolve_log_dir();
         fs::create_dir_all(&log_dir).map_err(|e| format!("Failed creating log dir: {}", e))?;
         let startup_log_path = log_dir.join("startup.log");
+        let kernel_log_path = log_dir.join("kernel.log");
 
         let stdout_log = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&startup_log_path)
-            .map_err(|e| format!("Failed to open stdout log {:?}: {}", startup_log_path, e))?;
+            .open(&kernel_log_path)
+            .map_err(|e| format!("Failed to open stdout log {:?}: {}", kernel_log_path, e))?;
 
         let stderr_log = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&startup_log_path)
-            .map_err(|e| format!("Failed to open stderr log {:?}: {}", startup_log_path, e))?;
+            .open(&kernel_log_path)
+            .map_err(|e| format!("Failed to open stderr log {:?}: {}", kernel_log_path, e))?;
 
         // 4. Safely configure Command with controlled working directory
         let mut cmd = Command::new(&binary_path);
