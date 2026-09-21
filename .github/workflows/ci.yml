@@ -315,6 +315,14 @@ jobs:
 
           # Launch the supervisor (don't wait — it's a GUI app)
           Write-Host "Launching AgenticOS.exe..."
+          Write-Host "Checking for browsers on the runner..."
+          $edgePaths = @(
+            "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+          )
+          foreach ($p in $edgePaths) {
+            if (Test-Path $p) { Write-Host "  Found: $p" }
+          }
           $p = Start-Process -FilePath "$instDir\AgenticOS.exe" -PassThru
           Start-Sleep -Seconds 5
 

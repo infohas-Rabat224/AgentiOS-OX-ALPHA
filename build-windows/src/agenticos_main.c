@@ -489,11 +489,14 @@ static void launch_ui(void) {
     HINSTANCE h = ShellExecuteW(NULL, L"open", g_ui_url, NULL, NULL, SW_SHOWNORMAL);
     INT_PTR rc = (INT_PTR)h;
     if (rc <= 32) {
+        /* Note: use %ld not %lld — _snwprintf on MSVC doesn't support
+         * the C99 %lld specifier. INT_PTR is 32-bit on x86 and 64-bit
+         * on x64, but cast to long it always fits. */
         WCHAR reason[512];
         _snwprintf(reason, 511,
-            L"Browser launch failed. ShellExecuteW returned %lld. "
+            L"Browser launch failed. ShellExecuteW returned %ld. "
             L"Install Microsoft Edge or Google Chrome, then click Retry.",
-            (long long)rc);
+            (long)rc);
         reason[511] = L'\0';
         set_error(ERR_BROWSER_LAUNCH_FAILED, reason);
         return;
@@ -1100,7 +1103,10 @@ static BOOL run_startup_sequence(void) {
     set_status(L"Backend healthy — launching browser window...");
 
     /* Launch the UI window. */
+    write_log(L"About to call launch_ui()...");
     launch_ui();
+    write_log(L"launch_ui() returned. g_browser_launched_ok=%d g_ui_pi.hProcess=%p",
+              g_browser_launched_ok ? 1 : 0, g_ui_pi.hProcess);
 
     /* Give the browser a moment to spawn, then verify. */
     if (g_ui_pi.hProcess) {
@@ -1119,10 +1125,12 @@ static BOOL run_startup_sequence(void) {
 
     /* ShellExecuteW path — assume success. */
     if (g_browser_launched_ok) {
+        write_log(L"Browser launched via ShellExecuteW (no handle to verify).");
         build_diagnostic_text(L"READY");
         return TRUE;
     }
 
+    write_log(L"Browser launch failed. Splash will stay visible with BROWSER_LAUNCH_FAILED.");
     build_diagnostic_text(L"BROWSER_LAUNCH");
     return FALSE;
 }
