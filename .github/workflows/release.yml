@@ -82,7 +82,7 @@ jobs:
           cl /O2 /EHsc `
              /Fe:build-windows\bin\agenticos-kernel.exe `
              build-windows\src\agenticos_kernel.c `
-             /link ws2_32.lib shlwapi.lib `
+             /link ws2_32.lib shlwapi.lib shell32.lib user32.lib advapi32.lib `
              /SUBSYSTEM:CONSOLE
           if (-not (Test-Path "build-windows\bin\agenticos-kernel.exe")) {
             Write-Error "Failed to compile agenticos-kernel.exe"

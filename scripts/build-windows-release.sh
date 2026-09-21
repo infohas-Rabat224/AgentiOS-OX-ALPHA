@@ -110,7 +110,7 @@ log "Step 3/6: Compiling native C kernel (agenticos-kernel.exe)"
 if ! ${CC} -O2 \
     -o "${BIN_DIR}/agenticos-kernel.exe" \
     "${ROOT}/build-windows/src/agenticos_kernel.c" \
-    -lws2_32 -lshlwapi; then
+    -lws2_32 -lshlwapi -lshell32 -luser32 -ladvapi32; then
     err "Compilation of agenticos-kernel.exe failed."
     exit 2
 fi

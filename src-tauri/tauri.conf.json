@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run build",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "bun run build",
+    "beforeBuildCommand": "bun run build"
   },
   "app": {
     "withGlobalTauri": true,
@@ -25,36 +25,6 @@
     "security": {
       "csp": null,
       "capabilities": ["default"]
-    }
-  },
-  "allowlist": {
-    "all": false,
-    "shell": {
-      "all": false,
-      "execute": true,
-      "open": true
-    },
-    "http": {
-      "all": true,
-      "request": true,
-      "scope": [
-        "http://127.0.0.1:8001/*",
-        "http://localhost:8001/*",
-        "http://127.0.0.1:3000/*",
-        "http://localhost:3000/*"
-      ]
-    },
-    "process": {
-      "all": true,
-      "relaunch": true,
-      "exit": true
-    },
-    "fs": {
-      "all": true,
-      "scope": ["$APPDATA/**", "$LOCALAPPDATA/**", "$RESOURCE/**"]
-    },
-    "path": {
-      "all": true
     }
   },
   "bundle": {
