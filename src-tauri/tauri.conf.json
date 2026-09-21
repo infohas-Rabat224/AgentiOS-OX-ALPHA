@@ -47,17 +47,12 @@
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",
-        "headerImage": null,
-        "sidebarImage": null,
         "installMode": "currentUser",
         "startMenuFolder": "AgenticOS",
         "languages": ["English"],
         "displayLanguageSelector": false,
         "compression": "lzma",
         "template": "../build-windows/installer.nsi"
-      },
-      "wix": {
-        "language": "en-US"
       }
     }
   }

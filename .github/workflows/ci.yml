@@ -126,7 +126,7 @@ jobs:
         run: |
           # Capture exit code without pipefail-losing it through tee.
           set +e
-          cargo check --message-format=short > cargo-check.log 2>&1
+          cargo check > cargo-check.log 2>&1
           rc=$?
           cat cargo-check.log
           if [ $rc -ne 0 ]; then
@@ -134,7 +134,7 @@ jobs:
             exit $rc
           fi
           # Belt-and-suspenders: also scan for any error lines
-          if grep -E '^error(\[|$)' cargo-check.log; then
+          if grep -E '^(error|warning: unused)' cargo-check.log | grep -E '^error'; then
             echo "ERROR: error lines detected in cargo check output"
             exit 1
           fi
