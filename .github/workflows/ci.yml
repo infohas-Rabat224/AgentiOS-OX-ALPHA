@@ -320,8 +320,16 @@ jobs:
 
           if ($p.HasExited) {
             Write-Error "Supervisor exited with code $($p.ExitCode)"
+            Write-Host "=== crash.log (if exists) ==="
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\crash.log" -ErrorAction SilentlyContinue
+            Write-Host "=== startup.log (if exists) ==="
             Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\startup.log" -ErrorAction SilentlyContinue
+            Write-Host "=== kernel.log (if exists) ==="
             Get-Content "$env:LOCALAPPDATA\AgenticOS\logs\kernel.log" -ErrorAction SilentlyContinue
+            Write-Host "=== runtime.json (if exists) ==="
+            Get-Content "$env:LOCALAPPDATA\AgenticOS\runtime.json" -ErrorAction SilentlyContinue
+            Write-Host "=== install dir contents ==="
+            Get-ChildItem "$env:LOCALAPPDATA\AgenticOS" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 50 FullName, Length | Format-Table -AutoSize
             exit 1
           }
           Write-Host "Supervisor running (PID $($p.Id))"
@@ -384,7 +392,7 @@ jobs:
         with:
           name: windows-smoke-logs
           path: |
-            ${{ runner.temp }}\..\..\..\..\..\..\Users\runneradmin\AppData\Local\AgenticOS\logs\*.log
             C:\Users\runneradmin\AppData\Local\AgenticOS\logs\*.log
+            C:\Users\runneradmin\AppData\Local\AgenticOS\runtime.json
           retention-days: 7
           if-no-files-found: warn
